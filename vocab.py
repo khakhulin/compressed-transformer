@@ -5,7 +5,7 @@ from itertools import chain
 
 import torch
 
-from util import read_corpus
+from nmt.utils.utils import read_corpus
 
 
 class VocabEntry(object):
