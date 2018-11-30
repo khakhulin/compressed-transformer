@@ -16,3 +16,11 @@ Example:
 ```
 python vocab.py --train_src data/train.de-en.de --train_tgt data/train.de-en.en --output data/vocab.bin
 ```
+
+* Install spacy
+
+```
+pip install -U spacy
+python -m spacy download en
+python -m spacy download de
+```
