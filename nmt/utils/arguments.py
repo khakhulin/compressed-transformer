@@ -5,6 +5,8 @@ def init_config():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--seed', default=42, type=int, help='random seed')
+    parser.add_argument('--cuda', action='store_true', default=False, help='use gpu')
+
     parser.add_argument('--mode', choices=['train', 'test', 'compress',], default='train', help='run mode')
     parser.add_argument('--vocab', type=str, help='path to the vocabulary')
     parser.add_argument('--batch_size', default=32, type=int, help='batch size')
@@ -13,6 +15,8 @@ def init_config():
     #  Model parameters
 
     # Data
+    parser.add_argument('--dataset', type=str, help='type of the dataset')
+
     parser.add_argument('--train_src', type=str, help='path to the training source file')
     parser.add_argument('--train_tgt', type=str, help='path to the training target file')
     parser.add_argument('--dev_src', type=str, help='path to the dev source file')
