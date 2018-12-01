@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchtext import data, datasets
 import math, copy, time
-import nmt.transformer as model
+import nmt.transformer as transformer
 
 
 class Batch:
@@ -25,7 +25,7 @@ class Batch:
         "Create a mask to hide padding and future words."
         tgt_mask = (tgt != pad).unsqueeze(-2)
         tgt_mask = tgt_mask & torch.tensor(
-            model.subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data), requires_grad=True)
+            transformer.subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data), requires_grad=True)
         return tgt_mask
 
 
@@ -39,6 +39,7 @@ def run_epoch(data_iter, model, loss_compute):
         # 2 x 25 x 512
         out = model.forward(batch.src, batch.trg,
                             batch.src_mask, batch.trg_mask)
+
         loss = loss_compute(out, batch.trg_y, batch.ntokens)
         total_loss += loss
         total_tokens += batch.ntokens
@@ -51,6 +52,9 @@ def run_epoch(data_iter, model, loss_compute):
             start = time.time()
             tokens = 0
         #batch size 2x25 ? max_len//2 ?
+        model.eval()
+        # print(greedy_decode(model, batch.src, batch.src_mask, max_len=30, start_symbol=1))
+
         if i % 100 == 0:
             model.eval()
 
@@ -122,3 +126,19 @@ def rebatch(pad_idx, batch):
     "Fix order in torchtext"
     src, trg = batch.src.transpose(0, 1), batch.trg.transpose(0, 1)
     return Batch(src, trg, pad_idx)
+
+
+def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    memory = model.encode(src, src_mask)
+    ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
+    for i in range(max_len-1):
+        out = model.decode(memory, src_mask,
+                           ys,
+                           transformer.subsequent_mask(ys.size(1))
+                                    .type_as(src.data))
+        prob = model.generator(out[:, -1])
+        _, next_word = torch.max(prob, dim = 1)
+        next_word = next_word.item()
+        ys = torch.cat([ys,
+                        torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
+    return ys
