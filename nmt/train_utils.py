@@ -25,7 +25,7 @@ class Batch:
         "Create a mask to hide padding and future words."
         tgt_mask = (tgt != pad).unsqueeze(-2)
         tgt_mask = tgt_mask & torch.tensor(
-            model.subsequent_mask(tgt.size(-1), requires_grad=True).type_as(tgt_mask.data))
+            model.subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data), requires_grad=True)
         return tgt_mask
 
 
@@ -36,6 +36,7 @@ def run_epoch(data_iter, model, loss_compute):
     total_loss = 0
     tokens = 0
     for i, batch in enumerate(data_iter):
+        # 2 x 25 x 512
         out = model.forward(batch.src, batch.trg,
                             batch.src_mask, batch.trg_mask)
         loss = loss_compute(out, batch.trg_y, batch.ntokens)
@@ -49,11 +50,7 @@ def run_epoch(data_iter, model, loss_compute):
                   (i, loss / float(batch.ntokens)))
             start = time.time()
             tokens = 0
-
-        print(batch.trg_y)
-        print(batch.trg_y.size())
-        print(out.size())
-        exit()
+        #batch size 2x25 ? max_len//2 ?
         if i % 100 == 0:
             model.eval()
 

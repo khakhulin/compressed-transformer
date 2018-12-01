@@ -78,6 +78,7 @@ class SimpleLossCompute:
             self.opt.optimizer.zero_grad()
         return loss.item() * norm.item()
 
+# TODO remove
 class IWSLT14(datasets.TranslationDataset):
     """The IWSLT 2016 TED talk translation task"""
 
@@ -146,7 +147,8 @@ def prepare_data(args, spacy_src, spacy_tgt):
     train_data, val_data, test_data = datasets.IWSLT.splits(
         exts=('.de', '.en'), fields=(SRC, TGT),
         filter_pred=lambda x: len(vars(x)['src']) <= MAX_LEN and
-                              len(vars(x)['trg']) <= MAX_LEN)
+                              len(vars(x)['trg']) <= MAX_LEN
+    )
     MIN_FREQ = 2
     SRC.build_vocab(train_data.src, min_freq=MIN_FREQ)
     TGT.build_vocab(train_data.trg, min_freq=MIN_FREQ)
@@ -158,16 +160,18 @@ def train(args):
     spacy_de = spacy.load('de')
     train_data, val_data, test_data, SRC, TGT = prepare_data(args, spacy_de, spacy_en)
 
+    BATCH_SIZE = args.batch_size
+
     pad_idx = TGT.vocab.stoi["<blank>"]
 
     # TODO : add model parameters to config
     # TODO : add loading model
-
+    print("Size of target vocabulary:", len(TGT.vocab))
+    print(BATCH_SIZE)
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), d_model=512, d_ff=2048, N=6)
     model.to(device)
     criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
     criterion.to(device)
-    BATCH_SIZE = 64
     train_iter = train_utils.WrapperIterator(train_data, batch_size=BATCH_SIZE, device=device,
                                        repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
                                        batch_size_fn=train_utils.batch_size_fn, train=True)
@@ -221,7 +225,6 @@ if __name__ == '__main__':
         torch.cuda.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    print(args, file=sys.stderr)
     # print("Device {} available".format(device))
     global device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
