@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torchtext import data, datasets
 import math, copy, time
 import nmt.transformer as transformer
+import nltk
 
 
 class Batch:
@@ -24,19 +25,84 @@ class Batch:
     def make_std_mask(tgt, pad):
         "Create a mask to hide padding and future words."
         tgt_mask = (tgt != pad).unsqueeze(-2)
-        tgt_mask = tgt_mask & torch.tensor(
-            transformer.subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data), requires_grad=True)
+        tgt_mask = tgt_mask & transformer.subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data)
+        tgt_mask = torch.tensor(tgt_mask, dtype=torch.float, requires_grad=True, device=tgt.device)
         return tgt_mask
+    
+
+class LossCompute:
+    "Wrapper for simple loss compute and train function."
+
+    def __init__(self, generator, criterion, opt=None):
+        self.generator = generator
+        self.criterion = criterion
+        self.opt = opt
+
+    def __call__(self, x, y, norm):
+        x = self.generator(x)
+        loss = self.criterion(x.contiguous().view(-1, x.size(-1)),
+                              y.contiguous().view(-1)) / norm.item()
+        loss.backward()
+        if self.opt is not None:
+            self.opt.step()
+            self.opt.optimizer.zero_grad()
+        return loss.item() * norm.item()
+    
+
+def evaluate_bleu(predictions, labels):
+    try:
+        bleu_nltk = nltk.translate.bleu_score.corpus_bleu(
+            labels, predictions, smoothing_function=nltk.translate.bleu_score.SmoothingFunction().method2)
+        # compared against bleu nltk without smoothing: for BLEU around 0.3 difference in 1e-4
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except BaseException as e:
+        print("\nWARNING: Could not compute BLEU-score. Error:", str(e))
+        bleu_nltk = 0
+
+    return bleu_nltk
+    
+    
+def valid(model, SRC, TGT, valid_iter):
+    
+    translate = []
+    tgt = []
+    for i, batch in enumerate(valid_iter):
+        src = batch.src.transpose(0, 1)[:1]
+        src_mask = (src != SRC.vocab.stoi["<blank>"]).unsqueeze(-2)
+        out = greedy_decode(model, src, src_mask, 
+                            max_len=60, start_symbol=TGT.vocab.stoi["<s>"])
+
+        translate_str = []
+        for i in range(1, out.size(1)):
+            sym = TGT.vocab.itos[out[0, i]]
+            if sym == "</s>": break
+            translate_str.append(sym)
+        translate.append(translate_str)
+
+        tgt_str = []
+        for i in range(1, batch.trg.size(0)):
+            sym = TGT.vocab.itos[batch.trg.data[i, 0]]
+            if sym == "</s>": break
+            tgt_str.append(sym)
+        tgt.append([tgt_str])
+        break
+    
+ 
+    return evaluate_bleu(translate, tgt)
 
 
-def run_epoch(data_iter, model, loss_compute):
+def run_epoch(data_iter, model, loss_compute, valid_params=None):
     "Standard Training and Logging Function"
     start = time.time()
     total_tokens = 0
     total_loss = 0
     tokens = 0
+    if valid_params is not None:
+        src_dict, tgt_dict, valid_iter = valid_params
     for i, batch in enumerate(data_iter):
         # 2 x 25 x 512
+        model.train()
         out = model.forward(batch.src, batch.trg,
                             batch.src_mask, batch.trg_mask)
 
@@ -52,11 +118,12 @@ def run_epoch(data_iter, model, loss_compute):
             start = time.time()
             tokens = 0
         #batch size 2x25 ? max_len//2 ?
-        model.eval()
         # print(greedy_decode(model, batch.src, batch.src_mask, max_len=30, start_symbol=1))
 
-        if i % 100 == 0:
+        if i % 100 == 0 and valid_params is not None:
             model.eval()
+            bleu_val = valid(model, src_dict, tgt_dict, valid_iter)
+            print(bleu_val)
 
     return total_loss / total_tokens
 

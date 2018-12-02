@@ -60,24 +60,6 @@ def init_training(args):
     return vocab, model, optimizer, nll_loss, cross_entropy_loss
 
 
-class SimpleLossCompute:
-    "Wrapper for simple loss compute and train function."
-
-    def __init__(self, generator, criterion, opt=None):
-        self.generator = generator
-        self.criterion = criterion
-        self.opt = opt
-
-    def __call__(self, x, y, norm):
-        x = self.generator(x)
-        loss = self.criterion(x.contiguous().view(-1, x.size(-1)),
-                              y.contiguous().view(-1)) / norm.item()
-        loss.backward()
-        if self.opt is not None:
-            self.opt.step()
-            self.opt.optimizer.zero_grad()
-        return loss.item() * norm.item()
-
 # TODO remove
 class IWSLT14(datasets.TranslationDataset):
     """The IWSLT 2016 TED talk translation task"""
@@ -167,7 +149,7 @@ def train(args):
     # TODO : add model parameters to config
     # TODO : add loading model
     print("Size of target vocabulary:", len(TGT.vocab))
-    print(BATCH_SIZE)
+    
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), d_model=512, d_ff=2048, N=6)
     model.to(device)
     criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
@@ -183,17 +165,18 @@ def train(args):
                                      torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), eps=1e-9))
 
     # train_time = begin_time = time.time()
+    valid_params = (SRC, TGT, valid_iter)
     for epoch in range(args.max_epoch):
 
         model.train()
         train_utils.run_epoch((train_utils.rebatch(pad_idx, b) for b in train_iter),
                         model,
-                        SimpleLossCompute(model.generator, criterion, model_opt))
+                        train_utils.LossCompute(model.generator, criterion, model_opt), valid_params=valid_params)
 
         model.eval()
         loss = train_utils.run_epoch((train_utils.rebatch(pad_idx, b) for b in valid_iter),
                                model,
-                               SimpleLossCompute(model.generator, criterion, model_opt))
+                               train_utils.LossCompute(model.generator, criterion, model_opt), valid_params=valid_params)
         print(loss)
 
 
