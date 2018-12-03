@@ -110,7 +110,7 @@ def train(args):
         
     BATCH_SIZE = args.batch_size
 
-    pad_idx = TGT.vocab.stoi["<blank>"]
+    pad_idx = TGT.vocab.stoi["<pad>"]
 
     # TODO : add model parameters to config
     # TODO : add loading model
@@ -130,17 +130,18 @@ def train(args):
         model.load_state_dict(state_dict)
 
 
-    criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
+    #criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
+    criterion = nn.NLLLoss(reduction="sum", ignore_index=0)
     criterion.to(device)
-    train_iter = train_utils.WrapperIterator(train_data, batch_size=BATCH_SIZE, device=device,
-                                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                                             batch_size_fn=train_utils.batch_size_fn, train=True)
-    valid_iter = train_utils.WrapperIterator(val_data, batch_size=BATCH_SIZE, device=device,
-                                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                                             batch_size_fn=train_utils.batch_size_fn, train=False)
+    train_iter = data.BucketIterator(train_data, batch_size=BATCH_SIZE, train=True, 
+                                 sort_within_batch=True, 
+                                 sort_key=lambda x: (len(x.src), len(x.trg)), repeat=False,
+                                 device=device)
+    valid_iter = data.Iterator(val_data, batch_size=1, train=False, sort=False, repeat=False, 
+                           device=device)
 
     model_opt = opt.WrapperOpt(model.src_embed[0].d_model, 1, 2000,
-                                     torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), eps=1e-9))
+                                     torch.optim.Adam(model.parameters(), lr=args.lr))
 
     # train_time = begin_time = time.time()
     valid_params = (SRC, TGT, valid_iter)
@@ -151,7 +152,10 @@ def train(args):
     os.makedirs(os.path.dirname(args.save_to), exist_ok=True)
 
     for epoch in range(args.max_epoch):
-
+        print("=" * 80)
+        print("Epoch ", epoch + 1)
+        print("=" * 80)
+        print("Train...")
         model.train()
         train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in train_iter),
                               model,
@@ -160,11 +164,12 @@ def train(args):
                               epoch_num = epoch)
 
         model.eval()
-        print("Validation loss")
-        loss = train_utils.run_epoch((train_utils.rebatch(pad_idx, b) for b in valid_iter),
-                                     model,
-                                     train_utils.LossCompute(model.generator, criterion, model_opt), valid_params=valid_params)
-        print(loss)
+        print("Validation...")
+        loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model,
+                                     train_utils.LossCompute(model.generator, criterion, model_opt), 
+                                     valid_params=valid_params, is_valid=True)
+        print()
+        print("Validation perplexity ", np.exp(loss))
 
 
 if __name__ == '__main__':

@@ -1,12 +1,6 @@
 ## Requirments
 
-* Install spacy
-
-```
-pip install -U spacy
-python -m spacy download en
-python -m spacy download de
-```
+* Install nltk
 
 * Install torchtext
 
