@@ -1,5 +1,6 @@
-import sys
 import os
+import sys
+
 
 import time
 
@@ -10,7 +11,12 @@ from torchtext import data, datasets
 import numpy as np
 import dill as pickle
 
+import nmt.transformer as transformer
+import nmt.utils.optimizer as opt
+import nmt.utils.train_utils as train_utils
 from nmt.utils.arguments import init_config
+
+
 from nmt.utils.prepare_data import prepare_data
 import nmt.utils.train_utils as train_utils
 import nmt.utils.optimizer as opt
@@ -30,7 +36,6 @@ def to_input_variable(sents, vocab):
 def init_training(args):
 
     if args.load_model:
-        print('load pre-trained model from [%s]' % args.load_model, file=sys.stderr)
         params = torch.load(args.load_model, map_location=lambda storage, loc: storage)
         vocab = params['vocab']
         saved_args = params['args']
@@ -121,34 +126,55 @@ def train(args):
     # TODO : add loading model
     print("Size of source vocabulary:", len(SRC.vocab))
     print("Size of target vocabulary:", len(TGT.vocab))
-    
+
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), d_model=512, d_ff=2048, N=6)
     model.to(device)
+
+    if args.load_model:
+        print('load model from [%s]' % args.load_model, file=sys.stderr)
+        params = torch.load(args.load_model, map_location=lambda storage, loc: storage)
+        # TODO args = params['args']
+        state_dict = params['model']
+        # opts = params['']
+        model.load_state_dict(state_dict)
+
+
     criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
     criterion.to(device)
     train_iter = train_utils.WrapperIterator(train_data, batch_size=BATCH_SIZE, device=device,
-                                       repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                                       batch_size_fn=train_utils.batch_size_fn, train=True)
+                                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
+                                             batch_size_fn=train_utils.batch_size_fn, train=True)
     valid_iter = train_utils.WrapperIterator(val_data, batch_size=BATCH_SIZE, device=device,
-                                       repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                                       batch_size_fn=train_utils.batch_size_fn, train=False)
+                                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
+                                             batch_size_fn=train_utils.batch_size_fn, train=False)
 
     model_opt = opt.WrapperOpt(model.src_embed[0].d_model, 1, 2000,
                                      torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), eps=1e-9))
 
     # train_time = begin_time = time.time()
     valid_params = (SRC, TGT, valid_iter)
+
+    print("Number of examples in train: ", len([_ for _ in train_iter]))
+    print("Number of examples in validation: ", len([_ for _ in valid_iter]))
+
+    os.makedirs(os.path.dirname(args.save_to), exist_ok=True)
+
+
+
     for epoch in range(args.max_epoch):
 
         model.train()
-        train_utils.run_epoch((train_utils.rebatch(pad_idx, b) for b in train_iter),
-                        model,
-                        train_utils.LossCompute(model.generator, criterion, model_opt), valid_params=valid_params)
+        train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in train_iter),
+                              model,
+                              train_utils.LossCompute(model.generator, criterion, model_opt),
+                              valid_params=valid_params,
+                              epoch_num = epoch)
 
         model.eval()
+        print("Validation loss")
         loss = train_utils.run_epoch((train_utils.rebatch(pad_idx, b) for b in valid_iter),
-                               model,
-                               train_utils.LossCompute(model.generator, criterion, model_opt), valid_params=valid_params)
+                                     model,
+                                     train_utils.LossCompute(model.generator, criterion, model_opt), valid_params=valid_params)
         print(loss)
 
 
