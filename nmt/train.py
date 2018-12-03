@@ -1,20 +1,16 @@
-import sys
 import os
+import sys
 
-import time
-import torch
+import spacy
 import torch.nn as nn
-import numpy as np
+from torchtext import data, datasets
 
+import nmt.transformer as transformer
+import nmt.utils.optimizer as opt
+import nmt.utils.train_utils as train_utils
 from nmt.utils.arguments import init_config
 from nmt.utils.utils import *
 
-import nmt.train_utils as train_utils
-import nmt.optimizer as opt
-import nmt.transformer as transformer
-
-from torchtext import data, datasets
-import spacy
 
 def to_input_variable(sents, vocab):
     """
@@ -164,11 +160,11 @@ def train(args):
     criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
     criterion.to(device)
     train_iter = train_utils.WrapperIterator(train_data, batch_size=BATCH_SIZE, device=device,
-                                       repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                                       batch_size_fn=train_utils.batch_size_fn, train=True)
+                                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
+                                             batch_size_fn=train_utils.batch_size_fn, train=True)
     valid_iter = train_utils.WrapperIterator(val_data, batch_size=BATCH_SIZE, device=device,
-                                       repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                                       batch_size_fn=train_utils.batch_size_fn, train=False)
+                                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
+                                             batch_size_fn=train_utils.batch_size_fn, train=False)
 
     model_opt = opt.WrapperOpt(model.src_embed[0].d_model, 1, 2000,
                                      torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), eps=1e-9))
@@ -186,17 +182,17 @@ def train(args):
     for epoch in range(args.max_epoch):
 
         model.train()
-        train_utils.run_epoch(args,(train_utils.rebatch(pad_idx, b) for b in train_iter),
-                        model,
-                        train_utils.LossCompute(model.generator, criterion, model_opt),
-                        valid_params=valid_params,
-                        epoch_num = epoch)
+        train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in train_iter),
+                              model,
+                              train_utils.LossCompute(model.generator, criterion, model_opt),
+                              valid_params=valid_params,
+                              epoch_num = epoch)
 
         model.eval()
         print("Validation loss")
         loss = train_utils.run_epoch((train_utils.rebatch(pad_idx, b) for b in valid_iter),
-                               model,
-                               train_utils.LossCompute(model.generator, criterion, model_opt), valid_params=valid_params)
+                                     model,
+                                     train_utils.LossCompute(model.generator, criterion, model_opt), valid_params=valid_params)
         print(loss)
 
 
