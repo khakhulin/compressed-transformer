@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchtext import data, datasets
-import math, copy, time
+import time, sys
 import nmt.transformer as transformer
 import nltk
 
@@ -63,36 +63,43 @@ def evaluate_bleu(predictions, labels):
     return bleu_nltk
     
     
-def valid(model, SRC, TGT, valid_iter):
+def valid(model, SRC, TGT, valid_iter, num_steps, to_words=False):
     
     translate = []
     tgt = []
     for i, batch in enumerate(valid_iter):
         src = batch.src.transpose(0, 1)[:1]
         src_mask = (src != SRC.vocab.stoi["<blank>"]).unsqueeze(-2)
-        out = greedy_decode(model, src, src_mask, 
+        out = greedy_decode(model, src, src_mask,
                             max_len=60, start_symbol=TGT.vocab.stoi["<s>"])
 
-        translate_str = []
-        for i in range(1, out.size(1)):
-            sym = TGT.vocab.itos[out[0, i]]
-            if sym == "</s>": break
-            translate_str.append(sym)
-        translate.append(translate_str)
+        # print(evaluate_bleu([[[str(i.item()) for i in out[0]]]], [list(batch.trg.data[:, 0].cpu())]))
 
-        tgt_str = []
-        for i in range(1, batch.trg.size(0)):
-            sym = TGT.vocab.itos[batch.trg.data[i, 0]]
-            if sym == "</s>": break
-            tgt_str.append(sym)
+        if to_words:
+            translate_str = []
+            for i in range(1, out.size(1)):
+                sym = TGT.vocab.itos[out[0, i]]
+                if sym == "</s>": break
+                translate_str.append(sym)
+
+            tgt_str = []
+            for i in range(1, batch.trg.size(0)):
+                sym = TGT.vocab.itos[batch.trg.data[i, 0]]
+                if sym == "</s>": break
+                tgt_str.append(sym)
+        else:
+            translate_str = [str(i.item()) for i in out[0]]
+            tgt_str = list(batch.trg.data[:, 0].cpu().numpy())
+
+        translate.append(translate_str)
         tgt.append([tgt_str])
-        break
-    
- 
+
+        if i % num_steps == 0:
+            break
+
     return evaluate_bleu(translate, tgt)
 
-
-def run_epoch(data_iter, model, loss_compute, valid_params=None):
+def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num=0):
     "Standard Training and Logging Function"
     start = time.time()
     total_tokens = 0
@@ -100,6 +107,7 @@ def run_epoch(data_iter, model, loss_compute, valid_params=None):
     tokens = 0
     if valid_params is not None:
         src_dict, tgt_dict, valid_iter = valid_params
+
     for i, batch in enumerate(data_iter):
         # 2 x 25 x 512
         model.train()
@@ -122,8 +130,25 @@ def run_epoch(data_iter, model, loss_compute, valid_params=None):
 
         if i % 100 == 0 and valid_params is not None:
             model.eval()
-            bleu_val = valid(model, src_dict, tgt_dict, valid_iter)
+            bleu_val = valid(model, src_dict, tgt_dict, valid_iter, args.valid_max_num)
             print(bleu_val)
+            exit()
+
+        if i % args.save_model_after == 0:
+            model_state_dict = model.state_dict()
+            model_file = args.save_to + 'model.iter{}.epoch{}.bin'.format(i, epoch_num)
+
+            checkpoint = {
+                'model': model_state_dict,
+                'opts': loss_compute.opt,
+                'epoch': epoch_num
+            }
+
+            print('save model to [%s]' % model_file, file=sys.stderr)
+
+            torch.save(checkpoint,model_file)
+
+            print("")
 
     return total_loss / total_tokens
 
