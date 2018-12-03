@@ -23,16 +23,6 @@ import nmt.utils.optimizer as opt
 import nmt.transformer as transformer
 
 
-def to_input_variable(sents, vocab):
-    """
-    return a tensor of shape (src_sent_len, batch_size)
-    """
-    word_ids = word2id(sents, vocab)
-    sents_t = input_transpose(word_ids, vocab['<pad>'], 50) #TODO max seq len bug
-    sents_var = torch.tensor(sents_t, dtype=torch.long, device=device)
-    return sents_var
-
-
 def init_training(args):
 
     if args.load_model:
@@ -127,7 +117,8 @@ def train(args):
     print("Size of source vocabulary:", len(SRC.vocab))
     print("Size of target vocabulary:", len(TGT.vocab))
 
-    model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), d_model=512, d_ff=2048, N=6)
+    model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), 
+                                   d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks)
     model.to(device)
 
     if args.load_model:
@@ -158,8 +149,6 @@ def train(args):
     print("Number of examples in validation: ", len([_ for _ in valid_iter]))
 
     os.makedirs(os.path.dirname(args.save_to), exist_ok=True)
-
-
 
     for epoch in range(args.max_epoch):
 

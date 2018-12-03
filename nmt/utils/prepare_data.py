@@ -1,12 +1,7 @@
 import torch
 from torchtext import data, datasets
-import spacy
+from nltk.tokenize import ToktokTokenizer
 
-def tokenize_de(text):
-    return [tok.text for tok in spacy_src.tokenizer(text)]
-
-def tokenize_en(text):
-    return [tok.text for tok in spacy_tgt.tokenizer(text)]
 
 def prepare_data(args):
     
@@ -15,12 +10,10 @@ def prepare_data(args):
     BLANK_WORD = "<blank>"
     
     if args.tokenize:
-        spacy_src = spacy.load('en')
-        spacy_tgt = spacy.load('de')
-        
-        SRC = data.Field(pad_token=BLANK_WORD, lower=args.lower, tokenize=tokenize_de)
+        toktok = ToktokTokenizer()        
+        SRC = data.Field(pad_token=BLANK_WORD, lower=args.lower, tokenize=toktok.tokenize)
         TGT = data.Field(init_token=BOS_WORD, eos_token=EOS_WORD, pad_token=BLANK_WORD, 
-                        lower=args.lower, tokenize=tokenize_en)
+                        lower=args.lower, tokenize=toktok.tokenize)
     else:
         
         SRC = data.Field(pad_token=BLANK_WORD, lower=args.lower)

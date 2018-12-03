@@ -9,10 +9,14 @@ def init_config():
 
     parser.add_argument('--mode', choices=['train', 'test', 'compress',], default='train', help='run mode')
     parser.add_argument('--vocab', type=str, help='path to the vocabulary')
-    parser.add_argument('--batch_size', default=32, type=int, help='batch size')
+   
 
     #  Model parameters
-
+    parser.add_argument('--batch_size', default=32, type=int, help='batch size')
+    parser.add_argument('--hidden_dim', default=512, type=int, help='size of hidden dimention for all layers')
+    parser.add_argument('--num_blocks', default=6, type=int, help='number of blocks')
+    parser.add_argument('--ff_dim', default=2048, type=int, help='size of dimention for feed forward part')
+    
     # Data
     parser.add_argument('--tokenize', action='store_true',  help='tokenize the dataset')
     parser.add_argument('--lower', action='store_true',  help='lowercase the dataset')

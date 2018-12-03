@@ -19,5 +19,5 @@ pip install torchtext
 * Run (with cuda, if it's available):
 
 ```
-PYTHONPATH="." python nmt/train.py --seed 45 --lower --min_freq 10
+PYTHONPATH="." python nmt/train.py --seed 45 --lower --tokenize --min_freq 10 
 ```

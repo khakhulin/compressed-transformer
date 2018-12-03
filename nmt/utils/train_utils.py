@@ -68,8 +68,7 @@ def valid(model, SRC, TGT, valid_iter, num_steps, to_words=False):
         src = batch.src.transpose(0, 1)[:1]
         src_mask = (src != SRC.vocab.stoi["<blank>"]).unsqueeze(-2)
         out = greedy_decode(model, src, src_mask,
-                            max_len=60, start_symbol=TGT.vocab.stoi["<s>"])
-
+                            max_len=50, start_symbol=TGT.vocab.stoi["<s>"])
         if to_words:
             translate_str = []
             for i in range(1, out.size(1)):
@@ -78,17 +77,17 @@ def valid(model, SRC, TGT, valid_iter, num_steps, to_words=False):
                 translate_str.append(sym)
             tgt_str = []
             for i in range(1, batch.trg.size(0)):
-                sym = TGT.vocab.itos[batch.trg.data[i, 0]]
+                sym = TGT.vocab.itos[batch.trg[i, 0]]
                 if sym == "</s>": break
                 tgt_str.append(sym)
         else:
             translate_str = [str(i.item()) for i in out[0]]
-            tgt_str = list(batch.trg.data[:, 0].cpu().numpy())
+            tgt_str = list(batch.trg[:, 0].cpu().numpy().astype(str))
 
         translate.append(translate_str)
         tgt.append([tgt_str])
 
-        if i % num_steps == 0:
+        if (i + 1) % num_steps == 0:
             break
 
     return evaluate_bleu(translate, tgt)
@@ -123,7 +122,7 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
         if i % 100 == 0 and valid_params is not None:
             model.eval()
             bleu_val = valid(model, src_dict, tgt_dict, valid_iter, args.valid_max_num)
-            print(bleu_val)
+            print("BLEU ", bleu_val)
 
         if i % args.save_model_after == 0:
             model_state_dict = model.state_dict()
