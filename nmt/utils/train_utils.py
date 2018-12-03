@@ -51,9 +51,7 @@ class LossCompute:
 
 def evaluate_bleu(predictions, labels):
     try:
-        bleu_nltk = nltk.translate.bleu_score.corpus_bleu(
-            labels, predictions, smoothing_function=nltk.translate.bleu_score.SmoothingFunction().method2)
-        # compared against bleu nltk without smoothing: for BLEU around 0.3 difference in 1e-4
+        bleu_nltk = nltk.translate.bleu_score.corpus_bleu(labels, predictions)
     except (KeyboardInterrupt, SystemExit):
         raise
     except BaseException as e:
@@ -64,7 +62,6 @@ def evaluate_bleu(predictions, labels):
     
     
 def valid(model, SRC, TGT, valid_iter, num_steps, to_words=False):
-    
     translate = []
     tgt = []
     for i, batch in enumerate(valid_iter):
@@ -73,15 +70,12 @@ def valid(model, SRC, TGT, valid_iter, num_steps, to_words=False):
         out = greedy_decode(model, src, src_mask,
                             max_len=60, start_symbol=TGT.vocab.stoi["<s>"])
 
-        # print(evaluate_bleu([[[str(i.item()) for i in out[0]]]], [list(batch.trg.data[:, 0].cpu())]))
-
         if to_words:
             translate_str = []
             for i in range(1, out.size(1)):
                 sym = TGT.vocab.itos[out[0, i]]
                 if sym == "</s>": break
                 translate_str.append(sym)
-
             tgt_str = []
             for i in range(1, batch.trg.size(0)):
                 sym = TGT.vocab.itos[batch.trg.data[i, 0]]
@@ -125,14 +119,11 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
                   (i, loss / float(batch.ntokens)))
             start = time.time()
             tokens = 0
-        #batch size 2x25 ? max_len//2 ?
-        # print(greedy_decode(model, batch.src, batch.src_mask, max_len=30, start_symbol=1))
-
+           
         if i % 100 == 0 and valid_params is not None:
             model.eval()
             bleu_val = valid(model, src_dict, tgt_dict, valid_iter, args.valid_max_num)
             print(bleu_val)
-            exit()
 
         if i % args.save_model_after == 0:
             model_state_dict = model.state_dict()
