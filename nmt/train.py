@@ -23,16 +23,6 @@ import nmt.utils.optimizer as opt
 import nmt.transformer as transformer
 
 
-def to_input_variable(sents, vocab):
-    """
-    return a tensor of shape (src_sent_len, batch_size)
-    """
-    word_ids = word2id(sents, vocab)
-    sents_t = input_transpose(word_ids, vocab['<pad>'], 50) #TODO max seq len bug
-    sents_var = torch.tensor(sents_t, dtype=torch.long, device=device)
-    return sents_var
-
-
 def init_training(args):
 
     if args.load_model:
@@ -120,14 +110,15 @@ def train(args):
         
     BATCH_SIZE = args.batch_size
 
-    pad_idx = TGT.vocab.stoi["<blank>"]
+    pad_idx = TGT.vocab.stoi["<pad>"]
 
     # TODO : add model parameters to config
     # TODO : add loading model
     print("Size of source vocabulary:", len(SRC.vocab))
     print("Size of target vocabulary:", len(TGT.vocab))
 
-    model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), d_model=512, d_ff=2048, N=6)
+    model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), 
+                                   d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks)
     model.to(device)
 
     if args.load_model:
@@ -139,17 +130,18 @@ def train(args):
         model.load_state_dict(state_dict)
 
 
-    criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
+    #criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
+    criterion = nn.NLLLoss(reduction="sum", ignore_index=0)
     criterion.to(device)
-    train_iter = train_utils.WrapperIterator(train_data, batch_size=BATCH_SIZE, device=device,
-                                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                                             batch_size_fn=train_utils.batch_size_fn, train=True)
-    valid_iter = train_utils.WrapperIterator(val_data, batch_size=BATCH_SIZE, device=device,
-                                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
-                                             batch_size_fn=train_utils.batch_size_fn, train=False)
+    train_iter = data.BucketIterator(train_data, batch_size=BATCH_SIZE, train=True, 
+                                 sort_within_batch=True, 
+                                 sort_key=lambda x: (len(x.src), len(x.trg)), repeat=False,
+                                 device=device)
+    valid_iter = data.Iterator(val_data, batch_size=1, train=False, sort=False, repeat=False, 
+                           device=device)
 
     model_opt = opt.WrapperOpt(model.src_embed[0].d_model, 1, 2000,
-                                     torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), eps=1e-9))
+                                     torch.optim.Adam(model.parameters(), lr=args.lr))
 
     # train_time = begin_time = time.time()
     valid_params = (SRC, TGT, valid_iter)
@@ -159,10 +151,11 @@ def train(args):
 
     os.makedirs(os.path.dirname(args.save_to), exist_ok=True)
 
-
-
     for epoch in range(args.max_epoch):
-
+        print("=" * 80)
+        print("Epoch ", epoch + 1)
+        print("=" * 80)
+        print("Train...")
         model.train()
         train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in train_iter),
                               model,
@@ -171,11 +164,12 @@ def train(args):
                               epoch_num = epoch)
 
         model.eval()
-        print("Validation loss")
-        loss = train_utils.run_epoch((train_utils.rebatch(pad_idx, b) for b in valid_iter),
-                                     model,
-                                     train_utils.LossCompute(model.generator, criterion, model_opt), valid_params=valid_params)
-        print(loss)
+        print("Validation...")
+        loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model,
+                                     train_utils.LossCompute(model.generator, criterion, model_opt), 
+                                     valid_params=valid_params, is_valid=True)
+        print()
+        print("Validation perplexity ", np.exp(loss))
 
 
 if __name__ == '__main__':

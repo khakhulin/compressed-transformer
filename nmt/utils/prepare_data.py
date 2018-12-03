@@ -1,35 +1,30 @@
 import torch
 from torchtext import data, datasets
-import spacy
+from nltk.tokenize import ToktokTokenizer
 
-def tokenize_de(text):
-    return [tok.text for tok in spacy_src.tokenizer(text)]
-
-def tokenize_en(text):
-    return [tok.text for tok in spacy_tgt.tokenizer(text)]
 
 def prepare_data(args):
     
-    BOS_WORD = '<s>'
-    EOS_WORD = '</s>'
-    BLANK_WORD = "<blank>"
+    UNK_TOKEN = "<unk>"
+    PAD_TOKEN = "<pad>"    
+    SOS_TOKEN = "<s>"
+    EOS_TOKEN = "</s>"
     
     if args.tokenize:
-        spacy_src = spacy.load('en')
-        spacy_tgt = spacy.load('de')
-        
-        SRC = data.Field(pad_token=BLANK_WORD, lower=args.lower, tokenize=tokenize_de)
-        TGT = data.Field(init_token=BOS_WORD, eos_token=EOS_WORD, pad_token=BLANK_WORD, 
-                        lower=args.lower, tokenize=tokenize_en)
+        toktok = ToktokTokenizer()        
+        SRC = data.Field(unk_token=UNK_TOKEN, pad_token=PAD_TOKEN, init_token=None, eos_token=EOS_TOKEN, 
+                         lower=args.lower, tokenize=toktok.tokenize)
+        TGT = data.Field(unk_token=UNK_TOKEN, pad_token=PAD_TOKEN, init_token=SOS_TOKEN, eos_token=EOS_TOKEN, 
+                        lower=args.lower, tokenize=toktok.tokenize)
     else:
         
-        SRC = data.Field(pad_token=BLANK_WORD, lower=args.lower)
-        TGT = data.Field(init_token=BOS_WORD, eos_token=EOS_WORD, pad_token=BLANK_WORD, 
+        SRC = data.Field(unk_token=UNK_TOKEN, pad_token=PAD_TOKEN, init_token=None, eos_token=EOS_TOKEN, lower=args.lower)
+        TGT = data.Field(unk_token=UNK_TOKEN, pad_token=PAD_TOKEN, init_token=SOS_TOKEN, eos_token=EOS_TOKEN, 
                         lower=args.lower)
 
     MAX_LEN = args.max_lenght
 
-    train_data, val_data, test_data = datasets.IWSLT.splits(
+    train_data, val_data, test_data = datasets.Multi30k.splits(
         exts=('.de', '.en'), fields=(SRC, TGT),
         filter_pred=lambda x: len(vars(x)['src']) <= MAX_LEN and
                               len(vars(x)['trg']) <= MAX_LEN
