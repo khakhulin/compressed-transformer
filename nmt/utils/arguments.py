@@ -24,6 +24,7 @@ def init_config():
     parser.add_argument('--test_src', type=str, help='path to the test source file')
     parser.add_argument('--test_tgt', type=str, help='path to the test target file')
 
+    parser.add_argument('--valid_max_num', default=100, type=int, help='maximum number of validation examples')
     parser.add_argument('--decode_max_time_step', default=200, type=int, help='maximum number of time steps used '
                                                                             'in decoding and sampling')
 
@@ -35,8 +36,8 @@ def init_config():
                         help='metric used for validation')
     parser.add_argument('--log_every', default=400, type=int, help='every n iterations to log training statistics')
     parser.add_argument('--load_model', default=None, type=str, help='path to the pre-trained model')
-    parser.add_argument('--save_to', default='model', type=str, help='save trained model to')
-    parser.add_argument('--save_model_after', default=0, type=int, help='save the model only after n validation iterations')
+    parser.add_argument('--save_to', default='saved_model/test', type=str, help='save trained model to')
+    parser.add_argument('--save_model_after', default=30, type=int, help='save the model only after n validation iterations')
     parser.add_argument('--save_to_file', default=None, type=str, help='if provided, save decoding results to file')
     parser.add_argument('--save_nbest', default=False, action='store_true', help='save nbest decoding results')
     parser.add_argument('--patience', default=5, type=int, help='training patience')
