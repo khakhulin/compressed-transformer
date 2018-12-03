@@ -10,12 +10,14 @@ def init_config():
     parser.add_argument('--mode', choices=['train', 'test', 'compress',], default='train', help='run mode')
     parser.add_argument('--vocab', type=str, help='path to the vocabulary')
     parser.add_argument('--batch_size', default=32, type=int, help='batch size')
-    parser.add_argument('--beam_size', default=5, type=int, help='beam size for beam search')
 
     #  Model parameters
 
     # Data
-    parser.add_argument('--dataset', type=str, help='type of the dataset')
+    parser.add_argument('--tokenize', action='store_true',  help='tokenize the dataset')
+    parser.add_argument('--lower', action='store_true',  help='lowercase the dataset')
+    parser.add_argument('--min_freq', type=int,  default=5, help='min frequency')
+    parser.add_argument('--max_lenght', type=int,  default=50, help='max lenght of sentencess')
 
     parser.add_argument('--train_src', type=str, help='path to the training source file')
     parser.add_argument('--train_tgt', type=str, help='path to the training target file')
