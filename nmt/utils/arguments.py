@@ -10,6 +10,7 @@ def init_config():
     parser.add_argument('--mode', choices=['train', 'test', 'compress',], default='train', help='run mode')
     parser.add_argument('--vocab', type=str, help='path to the vocabulary')
    
+    parser.add_argument('--exp_name', default='simple', type=str, help='name of the experiment')
 
     #  Model parameters
     parser.add_argument('--batch_size', default=32, type=int, help='batch size')
@@ -34,6 +35,8 @@ def init_config():
     parser.add_argument('--decode_max_time_step', default=200, type=int, help='maximum number of time steps used '
                                                                             'in decoding and sampling')
 
+    parser.add_argument('--valid_every', default=150, type=int, help='how often validate bleu in epoch')
+
     # Compress parameters
 
     # Training parameters
@@ -56,6 +59,8 @@ def init_config():
     parser.add_argument('--lr_decay', default=0.5, type=float, help='decay learning rate if the validation performance drops')
 
     parser.add_argument('--debug', default=False, action='store_true')
+    parser.add_argument('--compress', default=False, action='store_true')
+
     parser.add_argument('--smooth_bleu', action='store_true', default=False,
                         help='smooth sentence level BLEU score.')
     parser.add_argument('--sentence_bleu', action='store_true', default=False,

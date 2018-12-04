@@ -128,14 +128,14 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
         total_tokens += batch.ntokens
         tokens += batch.ntokens
         # print(batch.ntokens, time.time() - start, loss, tokens)
-        if i % 100 == 1 and not is_valid:
+        if i % 51 == 0 and not is_valid:
             elapsed = time.time() - start
             print("Epoch Step: %d Loss: %f" %
                   (i, loss / float(batch.ntokens)))
             start = time.time()
             tokens = 0
            
-        if (i + 1) % 500 == 0 and valid_params is not None and not is_valid:
+        if (i + 1) % args.valid_every == 0 and valid_params is not None and not is_valid:
             model.eval()
             bleu_val = valid(model, src_dict, tgt_dict, valid_iter, args.valid_max_num)
             print("BLEU ", bleu_val)
@@ -143,7 +143,7 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
 
         if i % args.save_model_after == 0 and not is_valid:
             model_state_dict = model.state_dict()
-            model_file = args.save_to + 'model.iter{}.epoch{}.bin'.format(i, epoch_num)
+            model_file = args.save_to + args.exp_name +'.iter{}.epoch{}.bin'.format(i, epoch_num)
 
             checkpoint = {
                 'model': model_state_dict,
