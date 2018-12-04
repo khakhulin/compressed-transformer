@@ -65,31 +65,44 @@ def valid(model, SRC, TGT, valid_iter, num_steps, to_words=False):
     translate = []
     tgt = []
     for i, batch in enumerate(valid_iter):
+
         src = batch.src.transpose(0, 1)[:1]
         src_mask = (src != SRC.vocab.stoi["<pad>"]).unsqueeze(-2)
         out = greedy_decode(model, src, src_mask,
                             max_len=50, start_symbol=TGT.vocab.stoi["<s>"])
-        if to_words:
-            translate_str = []
-            for i in range(1, out.size(1)):
-                sym = TGT.vocab.itos[out[0, i]]
+        translate_str = []
+        for j in range(1, out.size(1)):
+            if to_words:
+                sym = TGT.vocab.itos[out[0, j]]
                 if sym == "</s>": break
-                translate_str.append(sym)
-            tgt_str = []
-            for i in range(1, batch.trg.size(0)):
-                sym = TGT.vocab.itos[batch.trg[i, 0]]
+            else:
+                sym = out[0, j].item()
+                if TGT.vocab.stoi["</s>"] == sym:
+                    break
+            translate_str.append(sym)
+        tgt_str = []
+        for j in range(1, batch.trg.size(0)):
+            if to_words:
+                sym = TGT.vocab.itos[batch.trg[j, 0]]
                 if sym == "</s>": break
-                tgt_str.append(sym)
-        else:
-            translate_str = [str(i.item()) for i in out[0]]
-            tgt_str = list(batch.trg[:, 0].cpu().numpy().astype(str))
+            else:
+                sym = batch.trg[j, 0].item()
+                if TGT.vocab.stoi["</s>"] == sym:
+                    break
+            tgt_str.append(sym)
+
+        # else:
+        #     translate_str = [str(i.item()) for i in out[0]]
+        #     tgt_str = list(batch.trg[:, 0].cpu().numpy().astype(str))
 
         translate.append(translate_str)
         tgt.append([tgt_str])
 
+
         if (i + 1) % num_steps == 0:
             break
-
+    print(translate[0])
+    print(tgt[0][0])
     return evaluate_bleu(translate, tgt)
 
 def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num=0, is_valid=False):

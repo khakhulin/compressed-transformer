@@ -130,14 +130,14 @@ def train(args):
         model.load_state_dict(state_dict)
 
 
-    #criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
-    criterion = nn.NLLLoss(reduction="sum", ignore_index=0)
+    criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
+    # criterion = nn.NLLLoss(reduction="sum", ignore_index=0)
     criterion.to(device)
     train_iter = data.BucketIterator(train_data, batch_size=BATCH_SIZE, train=True, 
                                  sort_within_batch=True, 
                                  sort_key=lambda x: (len(x.src), len(x.trg)), repeat=False,
                                  device=device)
-    valid_iter = data.Iterator(val_data, batch_size=1, train=False, sort=False, repeat=False, 
+    valid_iter = data.Iterator(val_data, batch_size=BATCH_SIZE, train=False, sort=False, repeat=False,
                            device=device)
 
     model_opt = opt.WrapperOpt(model.src_embed[0].d_model, 1, 2000,
@@ -146,12 +146,20 @@ def train(args):
     # train_time = begin_time = time.time()
     valid_params = (SRC, TGT, valid_iter)
 
-    print("Number of examples in train: ", len([_ for _ in train_iter]))
-    print("Number of examples in validation: ", len([_ for _ in valid_iter]))
+    print("Number of examples in train: ", BATCH_SIZE * len([_ for _ in train_iter]))
+    print("Number of examples in validation: ", BATCH_SIZE * len([_ for _ in valid_iter]))
 
     os.makedirs(os.path.dirname(args.save_to), exist_ok=True)
 
     for epoch in range(args.max_epoch):
+        model.eval()
+        print("Validation...")
+        loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model,
+                                     train_utils.LossCompute(model.generator, criterion, model_opt),
+                                     valid_params=valid_params, is_valid=True)
+        print()
+        print("Validation perplexity ", np.exp(loss))
+
         print("=" * 80)
         print("Epoch ", epoch + 1)
         print("=" * 80)
@@ -163,13 +171,6 @@ def train(args):
                               valid_params=valid_params,
                               epoch_num = epoch)
 
-        model.eval()
-        print("Validation...")
-        loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model,
-                                     train_utils.LossCompute(model.generator, criterion, model_opt), 
-                                     valid_params=valid_params, is_valid=True)
-        print()
-        print("Validation perplexity ", np.exp(loss))
 
 
 if __name__ == '__main__':
