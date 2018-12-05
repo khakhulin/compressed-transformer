@@ -18,6 +18,17 @@ pip install torchtext
 * Run (with cuda, if it's available):
 
 ```
-PYTHONPATH="." python3 nmt/train.py --seed 45  --save_model_after 2000 \
- --valid_max_num 120  --lower --min_freq 1 --lower --tokenize --batch 128
+PYTHONPATH="." python3 nmt/train.py --seed 45  --save_model_after 1000 \
+ --valid_max_num 120  --lower --min_freq 3 --lower --tokenize --batch 82
  ```
+ 
+ 
+ For train compressed model:
+
+```
+PYTHONPATH="." python3 nmt/train.py --seed 45  --save_model_after 1000 \
+ --valid_max_num 120  --lower --min_freq 3 --lower --tokenize --batch 82 --compress --exp compressed
+
+ ```
+ 
+ 
