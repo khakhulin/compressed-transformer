@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math, copy, time
+from tensortorch import easytt as ttm
 
 
 class EncoderDecoder(nn.Module):
@@ -155,14 +156,22 @@ def attention(query, key, value, mask=None, dropout=None):
 
 
 class MultiHeadedAttention(nn.Module):
-    def __init__(self, h, d_model, dropout=0.1):
+    def __init__(self, h, d_model, dropout=0.1, compress=False):
         "Take in model size and number of heads."
         super(MultiHeadedAttention, self).__init__()
         assert d_model % h == 0
         # We assume d_v always equals d_k
         self.d_k = d_model // h
         self.h = h
-        self.linears = clones(nn.Linear(d_model, d_model), 4)
+
+        d_out_modes = [4, 4, 8, 4, 4]
+        d_in_modes = [2, 4, 8, 4, 2]
+        tt_ranks = [1, 4, 4, 4, 4, 1]
+
+        if compress:
+            self.linears = clones(ttm.TTLayer(d_in_modes, d_in_modes, tt_ranks, bias=False), 4)
+        else:
+            self.linears = clones(nn.Linear(d_model, d_model), 4)
         self.attn = None
         self.dropout = nn.Dropout(p=dropout)
         
@@ -190,10 +199,21 @@ class MultiHeadedAttention(nn.Module):
 
 class PositionwiseFeedForward(nn.Module):
     "Implements FFN equation."
-    def __init__(self, d_model, d_ff, dropout=0.1):
+    def __init__(self, d_model, d_ff, dropout=0.1, compress=False):
         super(PositionwiseFeedForward, self).__init__()
-        self.w_1 = nn.Linear(d_model, d_ff)
-        self.w_2 = nn.Linear(d_ff, d_model)
+
+        d_out_modes = [4, 4, 8, 4, 4]
+        d_in_modes = [2, 4, 8, 4, 2]
+        tt_ranks = [1, 3, 48, 76, 7, 1]
+        tt_ranks2 = [ 1,  1, 16, 54,  6,  1]
+        tt_ranks3 = [1, 4, 4, 4, 4, 1]
+        tt_ranks4 = [1, 2, 4, 4, 2, 1]
+        if compress:
+            self.w_1 = ttm.TTLayer(d_in_modes, d_out_modes, tt_ranks4,bias=False)
+            self.w_2 = ttm.TTLayer(d_out_modes,d_in_modes, tt_ranks3,bias=False)
+        else:
+            self.w_1 = nn.Linear(d_model, d_ff)
+            self.w_2 = nn.Linear(d_ff, d_model)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -235,11 +255,11 @@ class PositionalEncoding(nn.Module):
 
 
 def make_model(src_vocab, tgt_vocab, N=6, 
-               d_model=512, d_ff=2048, h=8, dropout=0.1):
+               d_model=512, d_ff=2048, h=8, dropout=0.1, compress=False, compress_att=False):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
-    attn = MultiHeadedAttention(h, d_model)
-    ff = PositionwiseFeedForward(d_model, d_ff, dropout)
+    attn = MultiHeadedAttention(h, d_model, compress_att)
+    ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress)
     position = PositionalEncoding(d_model, dropout)
     model = EncoderDecoder(
         Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),

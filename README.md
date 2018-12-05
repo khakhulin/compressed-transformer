@@ -6,7 +6,7 @@ Net can converge After 5 epoch with batch size 128.
 ## Requirments
 
 * Install nltk
-
+* Install tntorch
 * Install torchtext
 
 ```

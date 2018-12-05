@@ -117,8 +117,9 @@ def train(args):
     print("Size of source vocabulary:", len(SRC.vocab))
     print("Size of target vocabulary:", len(TGT.vocab))
 
+    print("FC matrix:", args.hidden_dim, args.ff_dim)
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), 
-                                   d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks)
+                                   d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks, compress=args.compress)
     model.to(device)
 
     if args.load_model:
@@ -149,17 +150,29 @@ def train(args):
     print("Number of examples in train: ", BATCH_SIZE * len([_ for _ in train_iter]))
     print("Number of examples in validation: ", BATCH_SIZE * len([_ for _ in valid_iter]))
 
+    model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+    params = sum([np.prod(p.size()) for p in model_parameters])
+    print("Number of parameters: ", params)
+
+    if args.debug:
+        model2 = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
+                                       d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks, compress=True)
+        model_parameters2 = filter(lambda p: p.requires_grad, model2.parameters())
+        params2 = sum([np.prod(p.size()) for p in model_parameters2])
+        print("Number of parameters: ", params2)
+
+        print("Tranable parameters ", params2)
+        for name, param in model2.named_parameters():
+            if param.requires_grad:
+                print(name, param.data.size())
+
+        print("compression rate: ", params/params2)
+
+        exit()
+
     os.makedirs(os.path.dirname(args.save_to), exist_ok=True)
 
     for epoch in range(args.max_epoch):
-        model.eval()
-        print("Validation...")
-        loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model,
-                                     train_utils.LossCompute(model.generator, criterion, model_opt),
-                                     valid_params=valid_params, is_valid=True)
-        print()
-        print("Validation perplexity ", np.exp(loss))
-
         print("=" * 80)
         print("Epoch ", epoch + 1)
         print("=" * 80)
@@ -171,6 +184,13 @@ def train(args):
                               valid_params=valid_params,
                               epoch_num = epoch)
 
+        model.eval()
+        print("Validation...")
+        loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model,
+                                     train_utils.LossCompute(model.generator, criterion, model_opt),
+                                     valid_params=valid_params, is_valid=True)
+        print()
+        print("Validation perplexity ", np.exp(loss))
 
 
 if __name__ == '__main__':
