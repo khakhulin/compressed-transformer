@@ -113,7 +113,8 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
     tokens = 0
     if valid_params is not None:
         src_dict, tgt_dict, valid_iter = valid_params
-        
+        hist_valid_scores = []
+
     bleu_all = 0
     count_all = 0
 
@@ -127,7 +128,7 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
         total_loss += loss
         total_tokens += batch.ntokens
         tokens += batch.ntokens
-        # print(batch.ntokens, time.time() - start, loss, tokens)
+
         if i % 51 == 0 and not is_valid:
             elapsed = time.time() - start
             print("Epoch Step: %d Loss: %f" %
@@ -139,9 +140,25 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
             model.eval()
             bleu_val = valid(model, src_dict, tgt_dict, valid_iter, args.valid_max_num)
             print("BLEU ", bleu_val)
-                
 
-        if i % args.save_model_after == 0 and not is_valid:
+            is_better_than_last = len(hist_valid_scores) == 0 or bleu_val > sorted(hist_valid_scores)[-1]
+            hist_valid_scores.append(bleu_val)
+
+            if is_better_than_last:
+                model_state_dict = model.state_dict()
+                model_file = args.save_to + args.exp_name + '.best.bin'
+
+                checkpoint = {
+                    'model': model_state_dict,
+                    'opts': loss_compute.opt,
+                    'epoch': epoch_num
+                }
+
+                print('save model to [%s]' % model_file, file=sys.stderr)
+
+                torch.save(checkpoint, model_file)
+
+        if i % args.save_model_after == 0 and not is_valid and not args.save_best:
             model_state_dict = model.state_dict()
             model_file = args.save_to + args.exp_name +'.iter{}.epoch{}.bin'.format(i, epoch_num)
 
@@ -153,6 +170,7 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
 
             print('save model to [%s]' % model_file, file=sys.stderr)
 
+
             torch.save(checkpoint,model_file)
 
             print("")
@@ -160,6 +178,7 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
     if is_valid:
         bleu_val = valid(model, src_dict, tgt_dict, valid_iter, 10000)
         print("BLEU (validation) ", bleu_val)
+        return total_loss / total_tokens, bleu_val
 
     return total_loss / total_tokens
 

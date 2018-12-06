@@ -25,11 +25,12 @@ import nmt.transformer as transformer
 # TODO add logger!
 # TODO add uniform initialization
 
+
 def train(args):
     train_data, val_data, test_data, SRC, TGT = prepare_data(args)
         
     BATCH_SIZE = args.batch_size
-
+    best_bleu_loss = 0
     pad_idx = TGT.vocab.stoi["<pad>"]
 
     # TODO : add model parameters to config
@@ -106,9 +107,22 @@ def train(args):
 
         model.eval()
         print("Validation...")
-        loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model,
+        loss, bleu_loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model,
                                      train_utils.LossCompute(model.generator, criterion, model_opt),
                                      valid_params=valid_params, is_valid=True)
+        if bleu_loss > best_bleu_loss:
+            best_bleu_loss = bleu_loss
+
+            model_state_dict = model.state_dict()
+            model_file = args.save_to + args.exp_name + '.bin'
+            checkpoint = {
+                'model': model_state_dict,
+            }
+
+            print('save model without optimizer [%s]' % model_file, file=sys.stderr)
+
+            torch.save(checkpoint, model_file)
+
         print()
         print("Validation perplexity ", np.exp(loss))
 

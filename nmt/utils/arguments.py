@@ -48,7 +48,7 @@ def init_config():
     parser.add_argument('--save_to', default='saved_model/test', type=str, help='save trained model to')
     parser.add_argument('--save_model_after', default=30, type=int, help='save the model only after n validation iterations')
     parser.add_argument('--save_to_file', default=None, type=str, help='if provided, save decoding results to file')
-    parser.add_argument('--save_nbest', default=False, action='store_true', help='save nbest decoding results')
+    parser.add_argument('--save_best', default=False, action='store_true', help='save best decoding results')
     parser.add_argument('--patience', default=5, type=int, help='training patience')
     parser.add_argument('--uniform_init', default=None, type=float, help='uniform initialization for parameters')
     parser.add_argument('--clip_grad', default=5., type=float, help='clip gradients')
