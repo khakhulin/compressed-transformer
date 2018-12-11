@@ -105,6 +105,7 @@ def valid(model, SRC, TGT, valid_iter, num_steps, to_words=False):
     print(tgt[0][0])
     return evaluate_bleu(translate, tgt)
 
+
 def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num=0, is_valid=False):
     "Standard Training and Logging Function"
     start = time.time()
@@ -119,12 +120,11 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
     count_all = 0
 
     for i, batch in enumerate(data_iter):
-        # 2 x 25 x 512
         model.train()
         out = model.forward(batch.src, batch.trg,
                             batch.src_mask, batch.trg_mask)
 
-        loss = loss_compute(out, batch.trg_y, batch.ntokens)
+        loss = loss_compute(out, batch.trg_y, batch.ntokens).item()
         total_loss += loss
         total_tokens += batch.ntokens
         tokens += batch.ntokens
@@ -138,7 +138,11 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
            
         if (i + 1) % args.valid_every == 0 and valid_params is not None and not is_valid:
             model.eval()
-            bleu_val = valid(model, src_dict, tgt_dict, valid_iter, args.valid_max_num)
+            if args.multi_gpu:
+                bleu_val = valid(model.module, src_dict, tgt_dict, valid_iter, args.valid_max_num)
+            else:
+                bleu_val = valid(model, src_dict, tgt_dict, valid_iter, args.valid_max_num)
+
             print("BLEU ", bleu_val)
 
             is_better_than_last = len(hist_valid_scores) == 0 or bleu_val > sorted(hist_valid_scores)[-1]
@@ -176,7 +180,11 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
             print("")
             
     if is_valid:
-        bleu_val = valid(model, src_dict, tgt_dict, valid_iter, 10000)
+        if args.multi_gpu:
+            bleu_val = valid(model.module, src_dict, tgt_dict, valid_iter, 10000)
+        else:
+            bleu_val = valid(model, src_dict, tgt_dict, valid_iter, 10000)
+
         print("BLEU (validation) ", bleu_val)
         return total_loss / total_tokens, bleu_val
 

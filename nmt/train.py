@@ -15,7 +15,7 @@ import nmt.transformer as transformer
 import nmt.utils.optimizer as opt
 import nmt.utils.train_utils as train_utils
 from nmt.utils.arguments import init_config
-
+from nmt.utils.gpu_utils import MultiGPULossCompute
 
 from nmt.utils.prepare_data import prepare_data
 import nmt.utils.train_utils as train_utils
@@ -39,10 +39,10 @@ def train(args):
     print("Size of target vocabulary:", len(TGT.vocab))
 
     print("FC matrix:", args.hidden_dim, args.ff_dim)
-    model = transformer.make_model(len(SRC.vocab), len(TGT.vocab), 
+    model = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
                                    d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks, compress=args.compress)
     model.to(device)
-
+    # model.cuda()
     if args.load_model:
         print('load model from [%s]' % args.load_model, file=sys.stderr)
         params = torch.load(args.load_model, map_location=lambda storage, loc: storage)
@@ -55,6 +55,7 @@ def train(args):
     criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
     # criterion = nn.NLLLoss(reduction="sum", ignore_index=0)
     criterion.to(device)
+    # criterion.cuda()
     train_iter = data.BucketIterator(train_data, batch_size=BATCH_SIZE, train=True, 
                                  sort_within_batch=True, 
                                  sort_key=lambda x: (len(x.src), len(x.trg)), repeat=False,
@@ -83,33 +84,57 @@ def train(args):
         print("Number of parameters: ", params2)
 
         print("Tranable parameters ", params2)
+        w1_param = []
         for name, param in model2.named_parameters():
-            if param.requires_grad:
-                print(name, param.data.size())
+            if name.__contains__("decoder.layers.5.feed_forward.w_1"):
+                w1_param.append(np.prod(param.size()))
+        print(np.sum(w1_param))
+
+        w1_param = []
+        for name, param in model.named_parameters():
+            if name.__contains__("decoder.layers.5.feed_forward.w_1"):
+                w1_param.append(np.prod(param.size()))
+        print(np.sum(w1_param))
+
+            # if param.requires_grad:
+            #     print(name, param.data.size())
 
         print("compression rate: ", params/params2)
 
         exit()
 
     os.makedirs(os.path.dirname(args.save_to), exist_ok=True)
+    # MULTI-GPU
+    # GPUs to use
+    devices = [0, 1] # TODO parameters list
+    multi_gpu = True
+
+    if args.multi_gpu:
+        model_parallel = nn.DataParallel(model, device_ids=devices)
 
     for epoch in range(args.max_epoch):
         print("=" * 80)
         print("Epoch ", epoch + 1)
         print("=" * 80)
         print("Train...")
-        model.train()
-        train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in train_iter),
-                              model,
-                              train_utils.LossCompute(model.generator, criterion, model_opt),
-                              valid_params=valid_params,
-                              epoch_num = epoch)
+        # model.train()
+        model_parallel.train()
+        if multi_gpu:
+            train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in train_iter),
+                                  model_parallel,
+                                  MultiGPULossCompute(model.generator, criterion,
+                                                      devices=devices, opt=model_opt),
+                                  valid_params=valid_params,
+                                  epoch_num=epoch)
 
-        model.eval()
-        print("Validation...")
-        loss, bleu_loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model,
-                                     train_utils.LossCompute(model.generator, criterion, model_opt),
-                                     valid_params=valid_params, is_valid=True)
+            model_parallel.eval()
+            print("Validation...")
+            loss, bleu_loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model_parallel,
+                                                    MultiGPULossCompute(model.generator, criterion,
+                                                                        devices=devices, opt=model_opt),
+                                         # train_utils.LossCompute(model.generator, criterion, model_opt),
+                                         valid_params=valid_params, is_valid=True)
+
         if bleu_loss > best_bleu_loss:
             best_bleu_loss = bleu_loss
 
