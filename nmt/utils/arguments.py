@@ -45,9 +45,9 @@ def init_config():
                         help='metric used for validation')
     parser.add_argument('--log_every', default=400, type=int, help='every n iterations to log training statistics')
     parser.add_argument('--load_model', default=None, type=str, help='path to the pre-trained model')
-    parser.add_argument('--save_to', default='saved_model/test', type=str, help='save trained model to')
+    parser.add_argument('--save_to', default='saved_model/', type=str, help='save trained model to')
     parser.add_argument('--save_model_after', default=30, type=int, help='save the model only after n validation iterations')
-    parser.add_argument('--save_to_file', default=None, type=str, help='if provided, save decoding results to file')
+    parser.add_argument('--save_to_file', default="files", type=str, help='if provided, save decoding results to file')
     parser.add_argument('--save_best', default=False, action='store_true', help='save best decoding results')
     parser.add_argument('--patience', default=5, type=int, help='training patience')
     parser.add_argument('--uniform_init', default=None, type=float, help='uniform initialization for parameters')
@@ -60,6 +60,8 @@ def init_config():
 
     parser.add_argument('--debug', default=False, action='store_true')
     parser.add_argument('--compress', default=False, action='store_true')
+    parser.add_argument('--multi-gpu', default=False, action='store_true')
+    parser.add_argument('--num_devices', default=2, type=int, help='numbers of gpus')
 
     parser.add_argument('--smooth_bleu', action='store_true', default=False,
                         help='smooth sentence level BLEU score.')

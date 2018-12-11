@@ -31,4 +31,14 @@ PYTHONPATH="." python3 nmt/train.py --seed 45  --save_model_after 1000 \
 
  ```
  
+ _Note_: use multi-gpu mode 
+ 
+ For test use:
+ ```
+ sh scripts/run_test.sh $path_to_your_uncompressed_model
+ ```
+ or for compressed:
+  ```
+ sh scripts/run_test_compressed.sh $path_to_your_compressed_model
+ ```
  

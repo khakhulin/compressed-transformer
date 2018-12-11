@@ -156,7 +156,7 @@ def attention(query, key, value, mask=None, dropout=None):
 
 
 class MultiHeadedAttention(nn.Module):
-    def __init__(self, h, d_model, dropout=0.1, compress=False):
+    def __init__(self, h, d_model, dropout=0.1, compress=True):
         "Take in model size and number of heads."
         super(MultiHeadedAttention, self).__init__()
         assert d_model % h == 0
@@ -167,7 +167,6 @@ class MultiHeadedAttention(nn.Module):
         d_out_modes = [4, 4, 8, 4, 4]
         d_in_modes = [2, 4, 8, 4, 2]
         tt_ranks = [1, 4, 4, 4, 4, 1]
-
         if compress:
             self.linears = clones(ttm.TTLayer(d_in_modes, d_in_modes, tt_ranks, bias=False), 4)
         else:
@@ -202,12 +201,16 @@ class PositionwiseFeedForward(nn.Module):
     def __init__(self, d_model, d_ff, dropout=0.1, compress=False):
         super(PositionwiseFeedForward, self).__init__()
 
+        # TODO create module with modes parameters
         d_out_modes = [4, 4, 8, 4, 4]
         d_in_modes = [2, 4, 8, 4, 2]
+
         tt_ranks = [1, 3, 48, 76, 7, 1]
         tt_ranks2 = [ 1,  1, 16, 54,  6,  1]
         tt_ranks3 = [1, 4, 4, 4, 4, 1]
         tt_ranks4 = [1, 2, 4, 4, 2, 1]
+        tt_ranks8 = [1, 2, 4, 8, 4, 2, 1]
+
         if compress:
             self.w_1 = ttm.TTLayer(d_in_modes, d_out_modes, tt_ranks4,bias=False)
             self.w_2 = ttm.TTLayer(d_out_modes,d_in_modes, tt_ranks3,bias=False)
@@ -230,7 +233,6 @@ class Embeddings(nn.Module):
         return self.lut(x) * math.sqrt(self.d_model)
 
 
-
 class PositionalEncoding(nn.Module):
     "Implement the PE function."
     def __init__(self, d_model, dropout, max_len=5000):
@@ -249,8 +251,7 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
         
     def forward(self, x):
-        x = x + torch.tensor(self.pe[:, :x.size(1)], 
-                         requires_grad=False)
+        x = x + torch.tensor(self.pe[:, :x.size(1)], requires_grad=False)
         return self.dropout(x)
 
 
@@ -258,7 +259,7 @@ def make_model(src_vocab, tgt_vocab, N=6,
                d_model=512, d_ff=2048, h=8, dropout=0.1, compress=False, compress_att=False):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
-    attn = MultiHeadedAttention(h, d_model, compress_att)
+    attn = MultiHeadedAttention(h, d_model, compress=compress_att)
     ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress)
     position = PositionalEncoding(d_model, dropout)
     model = EncoderDecoder(

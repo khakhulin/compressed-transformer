@@ -6,6 +6,7 @@ from torchtext import data, datasets
 import time, sys
 import nmt.transformer as transformer
 import nltk
+import os
 
 
 class Batch:
@@ -98,14 +99,14 @@ def valid(model, SRC, TGT, valid_iter, num_steps, to_words=False):
         translate.append(translate_str)
         tgt.append([tgt_str])
 
-
         if (i + 1) % num_steps == 0:
             break
     print(translate[0])
     print(tgt[0][0])
     return evaluate_bleu(translate, tgt)
 
-def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num=0, is_valid=False):
+
+def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num=0, is_valid=False, is_test=False):
     "Standard Training and Logging Function"
     start = time.time()
     total_tokens = 0
@@ -119,7 +120,6 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
     count_all = 0
 
     for i, batch in enumerate(data_iter):
-        # 2 x 25 x 512
         model.train()
         out = model.forward(batch.src, batch.trg,
                             batch.src_mask, batch.trg_mask)
@@ -138,7 +138,11 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
            
         if (i + 1) % args.valid_every == 0 and valid_params is not None and not is_valid:
             model.eval()
-            bleu_val = valid(model, src_dict, tgt_dict, valid_iter, args.valid_max_num)
+            if args.multi_gpu:
+                bleu_val = valid(model.module, src_dict, tgt_dict, valid_iter, args.valid_max_num)
+            else:
+                bleu_val = valid(model, src_dict, tgt_dict, valid_iter, args.valid_max_num)
+
             print("BLEU ", bleu_val)
 
             is_better_than_last = len(hist_valid_scores) == 0 or bleu_val > sorted(hist_valid_scores)[-1]
@@ -176,7 +180,23 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
             print("")
             
     if is_valid:
-        bleu_val = valid(model, src_dict, tgt_dict, valid_iter, 10000)
+        if args.multi_gpu:
+            bleu_val = valid(model.module, src_dict, tgt_dict, valid_iter, 10000)
+        else:
+            bleu_val = valid(model, src_dict, tgt_dict, valid_iter, 10000)
+
+        print("BLEU (validation) ", bleu_val)
+        return total_loss / total_tokens, bleu_val
+
+    if is_test:
+        os.makedirs(args.save_to_file, exist_ok=True)
+        if args.multi_gpu:
+            bleu_val = test_decode(model.module, src_dict, tgt_dict, valid_iter, 10000, \
+                                   to_words=True,
+                                   file_path=os.path.join(args.save_to_file,args.exp_name))
+        else:
+            bleu_val = test_decode(model, src_dict, tgt_dict, valid_iter, 10000)
+
         print("BLEU (validation) ", bleu_val)
         return total_loss / total_tokens, bleu_val
 
@@ -216,7 +236,8 @@ def rebatch(pad_idx, batch):
 
 def greedy_decode(model, src, src_mask, max_len, start_symbol):
     memory = model.encode(src, src_mask)
-    ys = torch.ones(1, 1).fill_(start_symbol).type_as(src)
+    batch_size = src.shape[0]
+    ys = torch.ones(batch_size, 1).fill_(start_symbol).type_as(src)
     for i in range(max_len-1):
         out = model.decode(memory, src_mask,
                            ys,
@@ -224,7 +245,58 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
                                     .type_as(src))
         prob = model.generator(out[:, -1])
         _, next_word = torch.max(prob, dim = 1)
-        next_word = next_word.item()
+        next_word = next_word.unsqueeze(1)
         ys = torch.cat([ys,
-                        torch.ones(1, 1).type_as(src).fill_(next_word)], dim=1)
+                        next_word.type_as(src)], dim=1)
     return ys
+
+
+def test_decode(model, SRC, TGT, valid_iter, num_steps, to_words=False, file_path=None):
+    translate = []
+    tgt = []
+    for i, batch in enumerate(valid_iter):
+
+        src = batch.src.transpose(0, 1)
+
+        src_mask = (src != SRC.vocab.stoi["<pad>"]).unsqueeze(-2)
+        out = greedy_decode(model, src, src_mask,
+                            max_len=50, start_symbol=TGT.vocab.stoi["<s>"])
+        for k in range(out.size(0)):
+            translate_str = []
+            for j in range(1, out.size(1)):
+                if to_words:
+                    sym = TGT.vocab.itos[out[0, j]]
+                    if sym == "</s>": break
+                else:
+                    sym = out[0, j].item()
+                    if TGT.vocab.stoi["</s>"] == sym:
+                        break
+                translate_str.append(sym)
+            tgt_str = []
+            for j in range(1, batch.trg.size(0)):
+                if to_words:
+                    sym = TGT.vocab.itos[batch.trg[j, 0]]
+                    if sym == "</s>": break
+                else:
+                    sym = batch.trg[j, 0].item()
+                    if TGT.vocab.stoi["</s>"] == sym:
+                        break
+                tgt_str.append(sym)
+
+            translate.append(translate_str)
+            tgt.append([tgt_str])
+
+
+    if file_path is not None:
+        print(len(translate))
+        print(len(tgt))
+
+        with open(file_path, 'w') as f:
+            for hyps in translate:
+                f.write(' '.join(hyps[1:-1]) + '\n')
+
+        with open(file_path+'.targets', 'w') as f:
+            for hyps in tgt:
+                f.write(' '.join(hyps[0][1:-1]) + '\n')
+
+    return evaluate_bleu(translate, tgt)
