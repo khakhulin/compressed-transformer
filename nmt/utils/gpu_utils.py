@@ -23,9 +23,11 @@ class MultiGPULossCompute:
         chunk_size = self.chunk_size
         for i in range(0, out_scatter[0].size(1), chunk_size):
             # Predict = distributions
+
             out_column = [[Variable(o[:, i:i+chunk_size].data,
                            requires_grad=self.opt is not None)]
                           for o in out_scatter]
+
             gen = nn.parallel.parallel_apply(generator, out_column)
 
             # Compute loss
@@ -36,8 +38,9 @@ class MultiGPULossCompute:
 
             # Sum and normalize loss
             ls = nn.parallel.gather(loss, target_device=self.devices[0])
-            ls = ls.sum()[0] / normalize
-            total += ls.data[0]
+
+            ls = ls.sum() / normalize
+            total += ls.item()
 
             # Backprop loss to output of transfomer
             if self.opt is not None:

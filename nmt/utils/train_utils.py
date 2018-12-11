@@ -124,7 +124,7 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
         out = model.forward(batch.src, batch.trg,
                             batch.src_mask, batch.trg_mask)
 
-        loss = loss_compute(out, batch.trg_y, batch.ntokens).item()
+        loss = loss_compute(out, batch.trg_y, batch.ntokens)
         total_loss += loss
         total_tokens += batch.ntokens
         tokens += batch.ntokens

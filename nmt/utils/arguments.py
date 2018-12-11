@@ -61,6 +61,7 @@ def init_config():
     parser.add_argument('--debug', default=False, action='store_true')
     parser.add_argument('--compress', default=False, action='store_true')
     parser.add_argument('--multi-gpu', default=False, action='store_true')
+    parser.add_argument('--num_devices', default=2, type=int, help='numbers of gpus')
 
     parser.add_argument('--smooth_bleu', action='store_true', default=False,
                         help='smooth sentence level BLEU score.')

@@ -104,12 +104,9 @@ def train(args):
         exit()
 
     os.makedirs(os.path.dirname(args.save_to), exist_ok=True)
-    # MULTI-GPU
-    # GPUs to use
-    devices = [0, 1] # TODO parameters list
-    multi_gpu = True
 
     if args.multi_gpu:
+        devices = list(np.arange(args.num_devices))
         model_parallel = nn.DataParallel(model, device_ids=devices)
 
     for epoch in range(args.max_epoch):
@@ -117,29 +114,36 @@ def train(args):
         print("Epoch ", epoch + 1)
         print("=" * 80)
         print("Train...")
-        # model.train()
-        model_parallel.train()
-        if multi_gpu:
-            train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in train_iter),
-                                  model_parallel,
-                                  MultiGPULossCompute(model.generator, criterion,
-                                                      devices=devices, opt=model_opt),
+        if args.multi_gpu:
+            model_parallel.train()
+            train_loss_fn = MultiGPULossCompute(model.generator, criterion,
+                                                      devices=devices, opt=model_opt)
+        else:
+            train_loss_fn = train_utils.LossCompute(model.generator, criterion, model_opt)
+
+            model.train()
+
+        train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in train_iter),
+                                  model_parallel, train_loss_fn,
                                   valid_params=valid_params,
                                   epoch_num=epoch)
 
+        if args.multi_gpu:
             model_parallel.eval()
-            print("Validation...")
-            loss, bleu_loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model_parallel,
-                                                    MultiGPULossCompute(model.generator, criterion,
-                                                                        devices=devices, opt=model_opt),
-                                         # train_utils.LossCompute(model.generator, criterion, model_opt),
-                                         valid_params=valid_params, is_valid=True)
+            val_loss_fn = MultiGPULossCompute(model.generator, criterion, devices=devices, opt=model_opt)
+        else:
+            model.eval()
+            val_loss_fn = train_utils.LossCompute(model.generator, criterion, model_opt)
+
+        print("Validation...")
+        loss, bleu_loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model_parallel,
+                                        val_loss_fn, valid_params=valid_params, is_valid=True)
 
         if bleu_loss > best_bleu_loss:
             best_bleu_loss = bleu_loss
 
             model_state_dict = model.state_dict()
-            model_file = args.save_to + args.exp_name + '.bin'
+            model_file = args.save_to + args.exp_name + 'valid.bin'
             checkpoint = {
                 'model': model_state_dict,
             }
@@ -155,7 +159,6 @@ def train(args):
 if __name__ == '__main__':
     args = init_config()
     print(args, file=sys.stderr)
-
     # seed the RNG
     torch.manual_seed(args.seed)
     if args.cuda:
