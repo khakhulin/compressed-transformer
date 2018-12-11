@@ -26,6 +26,61 @@ import nmt.transformer as transformer
 # TODO add uniform initialization
 
 
+def debug_compress_info(model, model2):
+    model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+    params = sum([np.prod(p.size()) for p in model_parameters])
+
+    model_parameters2 = filter(lambda p: p.requires_grad, model2.parameters())
+    params2 = sum([np.prod(p.size()) for p in model_parameters2])
+
+    print("Number of parameters in compress model: ", params2)
+
+    num_embd1 = []
+    num_embd2 = []
+    w1_param = []
+
+    flag = False
+
+    for name, param in model2.named_parameters():
+        if name.__contains__("decoder.layers.5.feed_forward.w_1"):
+            if not flag:
+                print(param.size())
+                flag = True
+            w1_param.append(np.prod(param.size()))
+        if name.__contains__("src_embed"):
+            num_embd2.append(np.prod(param.size()))
+        if name.__contains__("tgt_embed"):
+            num_embd2.append(np.prod(param.size()))
+        # print(name, param.data.size())
+
+    print("Num parameters in compress fc layer", np.sum(w1_param))
+    flag = False
+
+    w1_param = []
+    for name, param in model.named_parameters():
+        if name.__contains__("decoder.layers.5.feed_forward.w_1"):
+            w1_param.append(np.prod(param.size()))
+            if not flag:
+                print(param.size())
+                flag = True
+        if name.__contains__("src_embed"):
+            num_embd1.append(np.prod(param.size()))
+        if name.__contains__("tgt_embed"):
+            num_embd1.append(np.prod(param.size()))
+
+    print("Num parameters in original fc layer", np.sum(w1_param))
+
+    print("Number of parameters in embeddings layer")
+    print(np.sum(num_embd1))
+    print(np.sum(num_embd2))
+
+    print("compression rate: ", params / params2)
+
+    print("compression rate without embeddings: ", (params - np.sum(num_embd1)) / (params2 - np.sum(num_embd2)))
+
+    print()
+
+
 def train(args):
     train_data, val_data, test_data, SRC, TGT = prepare_data(args)
         
@@ -42,7 +97,6 @@ def train(args):
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
                                    d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks, compress=args.compress)
     model.to(device)
-    # model.cuda()
     if args.load_model:
         print('load model from [%s]' % args.load_model, file=sys.stderr)
         params = torch.load(args.load_model, map_location=lambda storage, loc: storage)
@@ -51,12 +105,10 @@ def train(args):
         # opts = params['']
         model.load_state_dict(state_dict)
 
-
     criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
     # criterion = nn.NLLLoss(reduction="sum", ignore_index=0)
     criterion.to(device)
-    # criterion.cuda()
-    train_iter = data.BucketIterator(train_data, batch_size=BATCH_SIZE, train=True, 
+    train_iter = data.BucketIterator(train_data, batch_size=BATCH_SIZE, train=True,
                                  sort_within_batch=True, 
                                  sort_key=lambda x: (len(x.src), len(x.trg)), repeat=False,
                                  device=device)
@@ -79,27 +131,10 @@ def train(args):
     if args.debug:
         model2 = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
                                        d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks, compress=True)
-        model_parameters2 = filter(lambda p: p.requires_grad, model2.parameters())
-        params2 = sum([np.prod(p.size()) for p in model_parameters2])
-        print("Number of parameters: ", params2)
 
-        print("Tranable parameters ", params2)
-        w1_param = []
-        for name, param in model2.named_parameters():
-            if name.__contains__("decoder.layers.5.feed_forward.w_1"):
-                w1_param.append(np.prod(param.size()))
-        print(np.sum(w1_param))
 
-        w1_param = []
-        for name, param in model.named_parameters():
-            if name.__contains__("decoder.layers.5.feed_forward.w_1"):
-                w1_param.append(np.prod(param.size()))
-        print(np.sum(w1_param))
-
-            # if param.requires_grad:
-            #     print(name, param.data.size())
-
-        print("compression rate: ", params/params2)
+        # print("Tranable parameters in fc module ", params2)
+        debug_compress_info(model, model2)
 
         exit()
 
@@ -156,6 +191,51 @@ def train(args):
         print("Validation perplexity ", np.exp(loss))
 
 
+def test(args):
+    train_data, val_data, test_data, SRC, TGT = prepare_data(args)
+
+    BATCH_SIZE = args.batch_size
+    best_bleu_loss = 0
+    pad_idx = TGT.vocab.stoi["<pad>"]
+    print("Size of source vocabulary:", len(SRC.vocab))
+    print("Size of target vocabulary:", len(TGT.vocab))
+
+    print("FC matrix:", args.hidden_dim, args.ff_dim)
+    model = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
+                                   d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks, compress=args.compress)
+    model.to(device)
+    if args.load_model:
+        print('load model from [%s]' % args.load_model, file=sys.stderr)
+        params = torch.load(args.load_model, map_location=lambda storage, loc: storage)
+        state_dict = params['model']
+        # opts = params['']
+        model.load_state_dict(state_dict)
+
+    criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
+    # criterion = nn.NLLLoss(reduction="sum", ignore_index=0)
+    criterion.to(device)
+
+    if args.multi_gpu:
+        devices = list(np.arange(args.num_devices))
+        model_parallel = nn.DataParallel(model, device_ids=devices)
+
+    model_opt = opt.WrapperOpt(model.src_embed[0].d_model, 1, 2000,
+                                     torch.optim.Adam(model.parameters(), lr=args.lr))
+
+    test_iter = data.Iterator(test_data, batch_size=BATCH_SIZE, train=False, sort=False, repeat=False,
+                                  device=device)
+    print("Number of examples in test: ", BATCH_SIZE * len([_ for _ in test_iter]))
+
+    test_params = (SRC, TGT, test_iter)
+    model.eval()
+    test_loss_fn = train_utils.LossCompute(model.generator, criterion, model_opt)
+    loss, bleu_loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in test_iter), model_parallel,
+                                            test_loss_fn, valid_params=test_params, is_valid=True)
+
+    print()
+    print("Test perplexity ", np.exp(loss))
+    print("Total bleu:", bleu_loss)
+
 if __name__ == '__main__':
     args = init_config()
     print(args, file=sys.stderr)
@@ -170,6 +250,8 @@ if __name__ == '__main__':
 
     if args.mode == 'train':
         train(args)
+    elif args.mode == 'test':
+        test(args)
 
 
 
