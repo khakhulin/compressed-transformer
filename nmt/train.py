@@ -10,7 +10,7 @@ from torchtext import data, datasets
 
 import numpy as np
 import dill as pickle
-
+import random
 import nmt.transformer as transformer
 import nmt.utils.optimizer as opt
 import nmt.utils.train_utils as train_utils
@@ -218,9 +218,6 @@ def test(args):
         devices = list(np.arange(args.num_devices))
         model_parallel = nn.DataParallel(model, device_ids=devices)
 
-    model_opt = opt.WrapperOpt(model.src_embed[0].d_model, 1, 2000,
-                                     torch.optim.Adam(model.parameters(), lr=args.lr))
-
     test_iter = data.Iterator(test_data, batch_size=50, train=False, sort=False, repeat=False,
                                   device=device)
     print("Number of examples in test: ", len([_ for _ in test_iter]))
@@ -235,8 +232,10 @@ def test(args):
                                to_words=True,
                                file_path=os.path.join(args.save_to_file, args.exp_name))
     else:
-        # bleu_loss = train_utils.test_decode(model, SRC, TGT, test_iter, 10000)
-        pass
+        model.eval()
+        bleu_loss = train_utils.test_decode(model, SRC, TGT, test_iter, -1,\
+                                            to_words=True,
+                                            file_path=os.path.join(args.save_to_file, args.exp_name))
     print()
     # print("Test perplexity ", np.exp(loss))
     print("Total bleu:", bleu_loss)
@@ -249,6 +248,7 @@ if __name__ == '__main__':
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
     np.random.seed(args.seed)
+    random.seed(args.seed)
 
     global device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
