@@ -212,7 +212,6 @@ def test(args):
         model.load_state_dict(state_dict)
 
     criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
-    # criterion = nn.NLLLoss(reduction="sum", ignore_index=0)
     criterion.to(device)
 
     if args.multi_gpu:
@@ -222,18 +221,24 @@ def test(args):
     model_opt = opt.WrapperOpt(model.src_embed[0].d_model, 1, 2000,
                                      torch.optim.Adam(model.parameters(), lr=args.lr))
 
-    test_iter = data.Iterator(test_data, batch_size=BATCH_SIZE, train=False, sort=False, repeat=False,
+    test_iter = data.Iterator(test_data, batch_size=50, train=False, sort=False, repeat=False,
                                   device=device)
-    print("Number of examples in test: ", BATCH_SIZE * len([_ for _ in test_iter]))
+    print("Number of examples in test: ", len([_ for _ in test_iter]))
 
-    test_params = (SRC, TGT, test_iter)
-    model.eval()
-    test_loss_fn = train_utils.LossCompute(model.generator, criterion, model_opt)
-    loss, bleu_loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in test_iter), model_parallel,
-                                            test_loss_fn, valid_params=test_params, is_valid=True)
+    # test_loss_fn = train_utils.LossCompute(model.generator, criterion, model_opt)
 
+    os.makedirs(args.save_to_file, exist_ok=True)
+    if args.multi_gpu:
+        model_parallel.eval()
+
+        bleu_loss = train_utils.test_decode(model_parallel.module, SRC, TGT, test_iter, 10000, \
+                               to_words=True,
+                               file_path=os.path.join(args.save_to_file, args.exp_name))
+    else:
+        # bleu_loss = train_utils.test_decode(model, SRC, TGT, test_iter, 10000)
+        pass
     print()
-    print("Test perplexity ", np.exp(loss))
+    # print("Test perplexity ", np.exp(loss))
     print("Total bleu:", bleu_loss)
 
 if __name__ == '__main__':
