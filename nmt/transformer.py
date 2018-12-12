@@ -49,9 +49,16 @@ def clones(module, N):
 
 class Encoder(nn.Module):
     "Core encoder is a stack of N layers"
-    def __init__(self, layer, N):
+    def __init__(self, layer, N, compress_k=0,  compressed_layer=None):
         super(Encoder, self).__init__()
-        self.layers = clones(layer, N)
+        if compress_k > 0:
+            self.layers = clones(compressed_layer, compress_k)
+            if N-compress_k > 0:
+                new_layers = clones(layer, N - compress_k)
+                for l in new_layers:
+                    self.layers.append(l)
+        else:
+            self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
         
     def forward(self, x, mask):
@@ -106,9 +113,16 @@ class EncoderLayer(nn.Module):
 
 class Decoder(nn.Module):
     "Generic N layer decoder with masking."
-    def __init__(self, layer, N):
+    def __init__(self, layer, N, compress_k=0,  compressed_layer=None):
         super(Decoder, self).__init__()
-        self.layers = clones(layer, N)
+        if compress_k > 0:
+            self.layers = clones(compressed_layer, compress_k)
+            if N-compress_k > 0:
+                new_layers = clones(layer, N - compress_k)
+                for l in new_layers:
+                    self.layers.append(l)
+        else:
+            self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
         
     def forward(self, x, memory, src_mask, tgt_mask):
@@ -256,16 +270,37 @@ class PositionalEncoding(nn.Module):
 
 
 def make_model(src_vocab, tgt_vocab, N=6, 
-               d_model=512, d_ff=2048, h=8, dropout=0.1, compress=False, compress_att=False):
+               d_model=512, d_ff=2048, h=8, dropout=0.1, compress=False,\
+               compress_att=False, num_compress_enc=6, num_compress_dec=6):
     "Helper: Construct a model from hyperparameters."
+    enc_k = dec_k= 0
+    enc_comp_ff = dec_comp_ff= None
+
     c = copy.deepcopy
     attn = MultiHeadedAttention(h, d_model, compress=compress_att)
-    ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress)
+    if compress:
+        enc_k = num_compress_enc
+        dec_k = num_compress_dec
+        enc_comp_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=compress)
+        dec_comp_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=compress)
+        enc_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=False)
+        dec_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=False)
+    else:
+        enc_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=compress)
+
+        dec_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=compress)
+
+    # Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout),N, \
+    #             compress_k=6, compressed_layers=EncoderLayer(d_model, c(attn), c(comp_ff), dropout))
     position = PositionalEncoding(d_model, dropout)
     model = EncoderDecoder(
-        Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),
-        Decoder(DecoderLayer(d_model, c(attn), c(attn), 
-                             c(ff), dropout), N),
+        Encoder(EncoderLayer(d_model, c(attn), c(enc_ff), dropout), N, \
+                            compress_k=enc_k, compressed_layer=\
+                    EncoderLayer(d_model, c(attn), c(enc_comp_ff ), dropout)),
+        Decoder(DecoderLayer(d_model, c(attn), c(attn),
+                             c(dec_ff), dropout), N, \
+                compress_k=dec_k, compressed_layer= \
+                    DecoderLayer(d_model, c(attn),c(attn), c(dec_comp_ff), dropout)),
         nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
         nn.Sequential(Embeddings(d_model, tgt_vocab), c(position)),
         Generator(d_model, tgt_vocab))

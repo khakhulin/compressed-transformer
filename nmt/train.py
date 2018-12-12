@@ -32,6 +32,7 @@ def debug_compress_info(model, model2):
 
     model_parameters2 = filter(lambda p: p.requires_grad, model2.parameters())
     params2 = sum([np.prod(p.size()) for p in model_parameters2])
+    print("Number of parameters in original model: ", params)
 
     print("Number of parameters in compress model: ", params2)
 
@@ -94,8 +95,13 @@ def train(args):
     print("Size of target vocabulary:", len(TGT.vocab))
 
     print("FC matrix:", args.hidden_dim, args.ff_dim)
+    print(args.compress)
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
-                                   d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks, compress=args.compress)
+                                   d_model=args.hidden_dim, d_ff=args.ff_dim,
+                                   N=args.num_blocks, compress=args.compress,
+                                   num_compress_enc=args.num_enc_blocks_comp,
+                                   num_compress_dec=args.num_dec_blocks_comp
+                                   )
     model.to(device)
     if args.load_model:
         print('load model from [%s]' % args.load_model, file=sys.stderr)
@@ -130,7 +136,10 @@ def train(args):
 
     if args.debug:
         model2 = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
-                                       d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks, compress=True)
+                                d_model=args.hidden_dim, d_ff=args.ff_dim,
+                                N=args.num_blocks, compress=True,
+                                num_compress_enc=args.num_enc_blocks_comp,
+                                num_compress_dec=args.num_dec_blocks_comp)
 
 
         # print("Tranable parameters in fc module ", params2)
@@ -202,7 +211,10 @@ def test(args):
 
     print("FC matrix:", args.hidden_dim, args.ff_dim)
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
-                                   d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks, compress=args.compress)
+                                   d_model=args.hidden_dim, d_ff=args.ff_dim,\
+                                   N=args.num_blocks, compress=args.compress, \
+                                    num_compress_enc = args.num_enc_blocks_comp,
+                                    num_compress_dec = args.num_dec_blocks_comp)
     model.to(device)
     if args.load_model:
         print('load model from [%s]' % args.load_model, file=sys.stderr)
@@ -210,6 +222,16 @@ def test(args):
         state_dict = params['model']
         # opts = params['']
         model.load_state_dict(state_dict)
+
+    if args.debug:
+        #fast check number of parameters
+        model_full = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
+                                       d_model=args.hidden_dim, d_ff=args.ff_dim, \
+                                       N=args.num_blocks, compress=False, \
+                                       num_compress_enc=0,
+                                       num_compress_dec=0)
+        debug_compress_info(model_full,model)
+        exit()
 
     criterion = train_utils.LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
     criterion.to(device)
@@ -229,7 +251,7 @@ def test(args):
         model_parallel.eval()
 
         bleu_loss = train_utils.test_decode(model_parallel.module, SRC, TGT, test_iter, 10000, \
-                               to_words=True,
+                                to_words=True,
                                file_path=os.path.join(args.save_to_file, args.exp_name))
     else:
         model.eval()
