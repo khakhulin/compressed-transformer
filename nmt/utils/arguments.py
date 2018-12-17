@@ -9,7 +9,7 @@ def init_config():
 
     parser.add_argument('--mode', choices=['train', 'test', 'compress',], default='train', help='run mode')
     parser.add_argument('--vocab', type=str, help='path to the vocabulary')
-   
+
     parser.add_argument('--exp_name', default='simple', type=str, help='name of the experiment')
 
     #  Model parameters
@@ -61,7 +61,8 @@ def init_config():
     parser.add_argument('--lr_decay', default=0.5, type=float, help='decay learning rate if the validation performance drops')
 
     parser.add_argument('--debug', default=False, action='store_true')
-    parser.add_argument('--compress', default=False, action='store_true')
+    parser.add_argument('--compress', default=False, action='store_true', help='train compressed')
+    parser.add_argument('--compress_mode', type=str, default='tt', help='Decomposition for training in compressed mode: tt | tucker')
     parser.add_argument('--multi-gpu', default=False, action='store_true')
     parser.add_argument('--num_devices', default=2, type=int, help='numbers of gpus')
 

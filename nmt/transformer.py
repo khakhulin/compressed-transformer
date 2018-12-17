@@ -5,11 +5,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math, copy, time
 from tensortorch import easytt as ttm
+from tensortorch import tucker
 
 
 class EncoderDecoder(nn.Module):
     """
-    A standard Encoder-Decoder architecture. Base for this and many 
+    A standard Encoder-Decoder architecture. Base for this and many
     other models.
     """
     def __init__(self, encoder, decoder, src_embed, tgt_embed, generator):
@@ -19,15 +20,15 @@ class EncoderDecoder(nn.Module):
         self.src_embed = src_embed
         self.tgt_embed = tgt_embed
         self.generator = generator
-        
+
     def forward(self, src, tgt, src_mask, tgt_mask):
         "Take in and process masked src and target sequences."
         return self.decode(self.encode(src, src_mask), src_mask,
                             tgt, tgt_mask)
-    
+
     def encode(self, src, src_mask):
         return self.encoder(self.src_embed(src), src_mask)
-    
+
     def decode(self, memory, src_mask, tgt, tgt_mask):
         return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
 
@@ -60,7 +61,7 @@ class Encoder(nn.Module):
         else:
             self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
-        
+
     def forward(self, x, mask):
         "Pass the input (and mask) through each layer in turn."
         for layer in self.layers:
@@ -124,7 +125,7 @@ class Decoder(nn.Module):
         else:
             self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
-        
+
     def forward(self, x, memory, src_mask, tgt_mask):
         for layer in self.layers:
             x = layer(x, memory, src_mask, tgt_mask)
@@ -140,7 +141,7 @@ class DecoderLayer(nn.Module):
         self.src_attn = src_attn
         self.feed_forward = feed_forward
         self.sublayer = clones(SublayerConnection(size, dropout), 3)
- 
+
     def forward(self, x, memory, src_mask, tgt_mask):
         "Follow Figure 1 (right) for connections."
         m = memory
@@ -187,23 +188,23 @@ class MultiHeadedAttention(nn.Module):
             self.linears = clones(nn.Linear(d_model, d_model), 4)
         self.attn = None
         self.dropout = nn.Dropout(p=dropout)
-        
+
     def forward(self, query, key, value, mask=None):
         if mask is not None:
             # Same mask applied to all h heads.
             mask = mask.unsqueeze(1)
         nbatches = query.size(0)
-        
-        # 1) Do all the linear projections in batch from d_model => h x d_k 
+
+        # 1) Do all the linear projections in batch from d_model => h x d_k
         query, key, value = \
             [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
              for l, x in zip(self.linears, (query, key, value))]
-        
-        # 2) Apply attention on all the projected vectors in batch. 
-        x, self.attn = attention(query, key, value, mask=mask, 
+
+        # 2) Apply attention on all the projected vectors in batch.
+        x, self.attn = attention(query, key, value, mask=mask,
                                  dropout=self.dropout)
-        
-        # 3) "Concat" using a view and apply a final linear. 
+
+        # 3) "Concat" using a view and apply a final linear.
         x = x.transpose(1, 2).contiguous() \
              .view(nbatches, -1, self.h * self.d_k)
         return self.linears[-1](x)
@@ -212,22 +213,31 @@ class MultiHeadedAttention(nn.Module):
 
 class PositionwiseFeedForward(nn.Module):
     "Implements FFN equation."
-    def __init__(self, d_model, d_ff, dropout=0.1, compress=False):
+    def __init__(self, d_model, d_ff, dropout=0.1, compress_mode=None):
         super(PositionwiseFeedForward, self).__init__()
 
         # TODO create module with modes parameters
         d_out_modes = [4, 4, 8, 4, 4]
         d_in_modes = [2, 4, 8, 4, 2]
 
-        tt_ranks = [1, 3, 48, 76, 7, 1]
-        tt_ranks2 = [ 1,  1, 16, 54,  6,  1]
-        tt_ranks3 = [1, 4, 4, 4, 4, 1]
-        tt_ranks4 = [1, 2, 4, 4, 2, 1]
-        tt_ranks8 = [1, 2, 4, 8, 4, 2, 1]
+        if compress_mode is not None:
+            if compress_mode == 'tt':
+                # tensor train
 
-        if compress:
-            self.w_1 = ttm.TTLayer(d_in_modes, d_out_modes, tt_ranks4,bias=False)
-            self.w_2 = ttm.TTLayer(d_out_modes,d_in_modes, tt_ranks3,bias=False)
+                tt_ranks = [1, 3, 48, 76, 7, 1]
+                tt_ranks2 = [ 1,  1, 16, 54,  6,  1]
+                tt_ranks3 = [1, 4, 4, 4, 4, 1]
+                tt_ranks4 = [1, 2, 4, 4, 2, 1]
+                tt_ranks8 = [1, 2, 4, 8, 4, 2, 1]
+
+                self.w_1 = ttm.TTLayer(d_in_modes, d_out_modes, tt_ranks4, bias=False)
+                self.w_2 = ttm.TTLayer(d_out_modes,d_in_modes, tt_ranks3, bias=False)
+            else:
+                # tucker
+                tucker_ranks = [2] * d_in_modes
+
+                self.w_1 = tucker.TuckerLinear(d_in_modes, d_out_modes, tucker_ranks, bias=False)
+                self.w_2 = tucker.TuckerLinear(d_out_modes,d_in_modes, tucker_ranks, bias=False)
         else:
             self.w_1 = nn.Linear(d_model, d_ff)
             self.w_2 = nn.Linear(d_ff, d_model)
@@ -252,7 +262,7 @@ class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout, max_len=5000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
-        
+
         # Compute the positional encodings once in log space.
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len).unsqueeze(1).float()
@@ -263,15 +273,14 @@ class PositionalEncoding(nn.Module):
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
         self.register_buffer('pe', pe)
-        
+
     def forward(self, x):
         x = x + torch.tensor(self.pe[:, :x.size(1)], requires_grad=False)
         return self.dropout(x)
 
 
-def make_model(src_vocab, tgt_vocab, N=6, 
-               d_model=512, d_ff=2048, h=8, dropout=0.1, compress=False,\
-               compress_att=False, num_compress_enc=6, num_compress_dec=6):
+def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0.1, \
+               compress=False, compress_mode='tt', compress_att=False, num_compress_enc=6, num_compress_dec=6):
     "Helper: Construct a model from hyperparameters."
     enc_k = dec_k= 0
     enc_comp_ff = dec_comp_ff= None
@@ -281,14 +290,14 @@ def make_model(src_vocab, tgt_vocab, N=6,
     if compress:
         enc_k = num_compress_enc
         dec_k = num_compress_dec
-        enc_comp_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=compress)
-        dec_comp_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=compress)
-        enc_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=False)
-        dec_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=False)
+        enc_comp_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress_mode=compress_mode)
+        dec_comp_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress_mode=compress_mode)
+        enc_ff = PositionwiseFeedForward(d_model, d_ff, dropout)
+        dec_ff = PositionwiseFeedForward(d_model, d_ff, dropout)
     else:
-        enc_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=compress)
+        enc_ff = PositionwiseFeedForward(d_model, d_ff, dropout)
 
-        dec_ff = PositionwiseFeedForward(d_model, d_ff, dropout, compress=compress)
+        dec_ff = PositionwiseFeedForward(d_model, d_ff, dropout)
 
     # Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout),N, \
     #             compress_k=6, compressed_layers=EncoderLayer(d_model, c(attn), c(comp_ff), dropout))
@@ -304,8 +313,8 @@ def make_model(src_vocab, tgt_vocab, N=6,
         nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
         nn.Sequential(Embeddings(d_model, tgt_vocab), c(position)),
         Generator(d_model, tgt_vocab))
-    
-    # This was important from their code. 
+
+    # This was important from their code.
     # Initialize parameters with Glorot / fan_avg.
     for p in model.parameters():
         if p.dim() > 1:
