@@ -3,7 +3,8 @@
 #model_path = ./saved_final_model/wmt16_compress.bin
 train_log="train."${job_name}".log"
 model_path=$1
-PYTHONPATH="." \
+N=$2
+CUDA_VISIBLE_DEVICES='0,1' PYTHONPATH="." \
 python3 nmt/train.py --seed 45 \
   --min_freq 1 \
   --valid_max_num 4 \
@@ -16,7 +17,9 @@ python3 nmt/train.py --seed 45 \
   --save_best \
   --valid_every 100 \
   --multi-gpu\
+   --num_enc_blocks_comp ${N} \
+   --num_dec ${N} \
   --mode test \
   --load_model ${model_path} \
   --compress \
-  --num_bl 6
+  --num_bl 3 --debug

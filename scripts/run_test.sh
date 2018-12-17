@@ -2,7 +2,7 @@
 
 train_log="train."${job_name}".log"
 model_path=$1
-PYTHONPATH="." \
+CUDA_VISIBLE_DEVICES='0,1' PYTHONPATH="." \
 python3 nmt/train.py --seed 45 \
   --min_freq 1 \
   --valid_max_num 4 \
