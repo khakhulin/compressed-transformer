@@ -29,3 +29,22 @@ We use tt-decomposition for every fc layer in encoder and decoder  in the follow
 (ones-dimensions have been omitted)
 
 Compression ratio is the ration of #(original parameters) to #(parameters in compressed networks) 
+
+
+### IWSLT14
+
+It's interesting that network with less parameters can be train in more efficiently.
+
+ | model | bleu-valid | bleu-test | time |
+ | ------ | ---- | ---- | ---- |
+ | transformer | 0.165 |  0.1363 | 146.16 |
+ | compressed 5| 0.212 | 0.197 | 237.97 |
+ | compressed 3| 0.212 | 0.192 | 187.35 |
+ 
+ 
+ *time for inference
+ 
+ ![image1](./imgs/val_bleu_curve.png)
+ 
+ 
+  ![image2](./imgs/val_loss_curve.png)

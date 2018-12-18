@@ -6,14 +6,11 @@ import time
 
 import torch
 import torch.nn as nn
-from torchtext import data, datasets
+from torchtext import data
 
 import numpy as np
 import dill as pickle
 import random
-import nmt.transformer as transformer
-import nmt.utils.optimizer as opt
-import nmt.utils.train_utils as train_utils
 from nmt.utils.arguments import init_config
 from nmt.utils.gpu_utils import MultiGPULossCompute
 
@@ -22,7 +19,6 @@ import nmt.utils.train_utils as train_utils
 import nmt.utils.optimizer as opt
 import nmt.transformer as transformer
 
-# TODO add logger!
 # TODO add uniform initialization
 
 
@@ -89,8 +85,6 @@ def train(args):
     best_bleu_loss = 0
     pad_idx = TGT.vocab.stoi["<pad>"]
 
-    # TODO : add model parameters to config
-    # TODO : add loading model
     print("Size of source vocabulary:", len(SRC.vocab))
     print("Size of target vocabulary:", len(TGT.vocab))
 
@@ -153,6 +147,10 @@ def train(args):
         devices = list(np.arange(args.num_devices))
         model_parallel = nn.DataParallel(model, device_ids=devices)
 
+    logger_file = {}#Logger(name=args.exp_name)
+    logger_file['bleu'] = []
+    logger_file['loss'] = []
+
     for epoch in range(args.max_epoch):
         print("=" * 80)
         print("Epoch ", epoch + 1)
@@ -162,15 +160,17 @@ def train(args):
             model_parallel.train()
             train_loss_fn = MultiGPULossCompute(model.generator, criterion,
                                                       devices=devices, opt=model_opt)
+            train_model = model_parallel
+
         else:
             train_loss_fn = train_utils.LossCompute(model.generator, criterion, model_opt)
 
             model.train()
 
-        train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in train_iter),
-                                  model_parallel, train_loss_fn,
+        _, logger_file = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in train_iter),
+                                  model_parallel if args.multi_gpu else model, train_loss_fn,
                                   valid_params=valid_params,
-                                  epoch_num=epoch)
+                                  epoch_num=epoch, logger=logger_file)
 
         if args.multi_gpu:
             model_parallel.eval()
@@ -180,7 +180,8 @@ def train(args):
             val_loss_fn = train_utils.LossCompute(model.generator, criterion, model_opt)
 
         print("Validation...")
-        loss, bleu_loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model_parallel,
+        loss, bleu_loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter),\
+                                        model_parallel if args.multi_gpu else model,
                                         val_loss_fn, valid_params=valid_params, is_valid=True)
 
         if bleu_loss > best_bleu_loss:
@@ -198,6 +199,9 @@ def train(args):
 
         print()
         print("Validation perplexity ", np.exp(loss))
+
+    with open("./logs/"+args.exp_name, 'wb') as f_out:
+        pickle.dump(logger_file, f_out)
 
 
 def test(args):
@@ -222,12 +226,11 @@ def test(args):
         state_dict = params['model']
         # opts = params['']
         model.load_state_dict(state_dict)
-
     if args.debug:
         #fast check number of parameters
         model_full = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
                                        d_model=args.hidden_dim, d_ff=args.ff_dim, \
-                                       N=args.num_blocks, compress=False, \
+                                       N=6, compress=False, \
                                        num_compress_enc=0,
                                        num_compress_dec=0)
         debug_compress_info(model_full,model)
@@ -249,10 +252,13 @@ def test(args):
     os.makedirs(args.save_to_file, exist_ok=True)
     if args.multi_gpu:
         model_parallel.eval()
+        start_infer_time = time.time()
 
         bleu_loss = train_utils.test_decode(model_parallel.module, SRC, TGT, test_iter, 10000, \
                                 to_words=True,
                                file_path=os.path.join(args.save_to_file, args.exp_name))
+        print("Time for inference: ", time.time() - start_infer_time)
+
     else:
         model.eval()
         bleu_loss = train_utils.test_decode(model, SRC, TGT, test_iter, -1,\
