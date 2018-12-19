@@ -66,8 +66,22 @@ small-transformer model has 3 block-layers instead of 6
 | tt-transformer | 0.472 | 3/6 |  1.243 | 45.28 |
 | tt-transformer | 0.450 | 2/6 | 1.150 | 43.97
 | tt-transformer | 0.369 | 1/6 | 1.07 | 34.63
-
+| tucker | 0.447 | 6/6 | 1.64 | 43.83 |
  
+num parameters in tucker: 39062062
+
+tt with max_rank = 2
+Num parameters in compress fc layer 416
+
+
+| method         | test, bleu  | N_comp/N  | Compress_ratio | Time |
+|----------------|---------|---------| -------------- |------|
+| original model |  0.442 |  0/6   |  1.0 |  41.38 |
+| tt-transformer | 0.434 | 6/6 | 1.65 | 76.89 |
+| tt-transformer | 0.489 | 5/6 | 1.485 | 75.24 |
+| tt-transformer | 0.412 | 3/6 | 1.243 | 71.36 |
+| tt-transformer | 0.414 | 1/6 | 1.069 | 40.97 |
+
 
 We use tt-decomposition for every fc layer in encoder and decoder  in the following way:
 - ranks of the first layer   : 2x4x4x2
