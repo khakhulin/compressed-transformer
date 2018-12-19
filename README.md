@@ -94,3 +94,7 @@ It's interesting that network with less parameters can be train in more efficien
  
  
   ![image2](./imgs/val_loss_curve.png)
+  
+  ## References
+1. Vaswani, Ashish, et al. ["Attention is all you need."](https://arxiv.org/abs/1706.03762.pdf) Advances in Neural Information Processing Systems. 2017.
+2. Novikov, Alexander, et al. ["Tensorizing neural networks."](https://arxiv.org/pdf/1509.06569.pdf) Advances in Neural Information Processing Systems. 2015.
