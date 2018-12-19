@@ -234,10 +234,10 @@ class PositionwiseFeedForward(nn.Module):
                 self.w_2 = ttm.TTLayer(d_out_modes,d_in_modes, tt_ranks3, bias=False)
             else:
                 # tucker
-                tucker_ranks = [2] * d_in_modes
-
+                tucker_ranks = [2] * len(d_in_modes)
+                
                 self.w_1 = tucker.TuckerLinear(d_in_modes, d_out_modes, tucker_ranks, bias=False)
-                self.w_2 = tucker.TuckerLinear(d_out_modes,d_in_modes, tucker_ranks, bias=False)
+                self.w_2 = tucker.TuckerLinear(d_out_modes, d_in_modes, tucker_ranks, bias=False)
         else:
             self.w_1 = nn.Linear(d_model, d_ff)
             self.w_2 = nn.Linear(d_ff, d_model)

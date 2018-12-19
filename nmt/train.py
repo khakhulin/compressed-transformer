@@ -169,7 +169,7 @@ def train(args):
             model.train()
 
         train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in train_iter),
-                                  model_parallel, train_loss_fn,
+                                  model_parallel if args.multi_gpu else model, train_loss_fn,
                                   valid_params=valid_params,
                                   epoch_num=epoch)
 
@@ -181,7 +181,7 @@ def train(args):
             val_loss_fn = train_utils.LossCompute(model.generator, criterion, model_opt)
 
         print("Validation...")
-        loss, bleu_loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model_parallel,
+        loss, bleu_loss = train_utils.run_epoch(args, (train_utils.rebatch(pad_idx, b) for b in valid_iter), model_parallel if args.multi_gpu else model,
                                         val_loss_fn, valid_params=valid_params, is_valid=True)
 
         if bleu_loss > best_bleu_loss:

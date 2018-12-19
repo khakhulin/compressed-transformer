@@ -5,9 +5,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class TuckerLinear(nn.Module):
-    def __init__(self, in_modes, out_modes, ranks, bias=True, cache=True):
+    def __init__(self, in_modes, out_modes, ranks, bias=True, cache=False):
+        """
+        cache: if cache is True, pre calculated W_tsr until user reset the variable
+        """
         super().__init__()
         assert len(in_modes) == len(out_modes) == len(ranks)
         self.in_modes = in_modes
@@ -25,11 +27,10 @@ class TuckerLinear(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        CONST = (0.05 / np.prod(self.ranks + self.ranks) ** 0.5) ** (
-        1.0 / (len(self.in_modes) + len(self.out_modes) + 1))
-        nn.init.normal(self.core, 0, CONST)
+        CONST = (0.05 / np.prod(self.ranks + self.ranks)**0.5)**(1.0 / (len(self.in_modes) + len(self.out_modes) + 1))
+        nn.init.normal_(self.core, 0, CONST)
         for ii in range(len(self.factors)):
-            nn.init.normal(self.factors[ii], 0, CONST)
+            nn.init.normal_(self.factors[ii], 0, CONST)
             pass
         if self.bias is not None:
             self.bias.data.zero_()
@@ -66,7 +67,6 @@ class TuckerLinear(nn.Module):
 def _tensor_to_matrix(in_modes, out_modes, tensor) :
     return tensor.contiguous().view(int(np.prod(in_modes)), int(np.prod(out_modes)))
 
-
 def _n_mode_product(core, factor, mode) :
     assert factor.dim() == 2
     # core = [i_1,..,i_j,..,i_D]
@@ -87,3 +87,4 @@ def _tucker_cores_to_tensor(core, list_factors) :
     for ii in range(n_dim) :
         tensor_out = _n_mode_product(tensor_out, list_factors[ii], ii)
     return tensor_out
+
