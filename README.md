@@ -27,7 +27,7 @@ PYTHONPATH="." python3 nmt/train.py --seed 45  --save_model_after 1000 \
 
 ```
 PYTHONPATH="." python3 nmt/train.py --seed 45  --save_model_after 1000 \
- --valid_max_num 120  --lower --min_freq 3 --lower --tokenize --batch 82 --compress --exp compressed
+ --valid_max_num 120  --lower --min_freq 3 --lower --tokenize --batch 82 --compress --compress_mode tt --exp compressed
 
  ```
  

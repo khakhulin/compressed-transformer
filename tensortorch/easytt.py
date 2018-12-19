@@ -63,7 +63,7 @@ class TTLayer(nn.Module):
             self.bias = nn.Parameter(torch.Tensor(np.prod(out_modes)))
         else:
             self.register_parameter('bias', None)
-
+        print("2")
         self.reset_parameters()
 
     def reset_normal(self):

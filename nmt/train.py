@@ -80,7 +80,7 @@ def debug_compress_info(model, model2):
 
 def train(args):
     train_data, val_data, test_data, SRC, TGT = prepare_data(args)
-        
+
     BATCH_SIZE = args.batch_size
     best_bleu_loss = 0
     pad_idx = TGT.vocab.stoi["<pad>"]
@@ -93,6 +93,7 @@ def train(args):
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
                                    d_model=args.hidden_dim, d_ff=args.ff_dim,
                                    N=args.num_blocks, compress=args.compress,
+                                   compress_mode=args.compress_mode,
                                    num_compress_enc=args.num_enc_blocks_comp,
                                    num_compress_dec=args.num_dec_blocks_comp
                                    )
@@ -109,7 +110,7 @@ def train(args):
     # criterion = nn.NLLLoss(reduction="sum", ignore_index=0)
     criterion.to(device)
     train_iter = data.BucketIterator(train_data, batch_size=BATCH_SIZE, train=True,
-                                 sort_within_batch=True, 
+                                 sort_within_batch=True,
                                  sort_key=lambda x: (len(x.src), len(x.trg)), repeat=False,
                                  device=device)
     valid_iter = data.Iterator(val_data, batch_size=BATCH_SIZE, train=False, sort=False, repeat=False,
@@ -285,6 +286,3 @@ if __name__ == '__main__':
         train(args)
     elif args.mode == 'test':
         test(args)
-
-
-
