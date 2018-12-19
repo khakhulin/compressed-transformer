@@ -106,7 +106,8 @@ def valid(model, SRC, TGT, valid_iter, num_steps, to_words=False):
     return evaluate_bleu(translate, tgt)
 
 
-def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num=0, is_valid=False, is_test=False):
+def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num=0,
+            is_valid=False, is_test=False, logger=None):
     "Standard Training and Logging Function"
     start = time.time()
     total_tokens = 0
@@ -133,6 +134,8 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
             elapsed = time.time() - start
             print("Epoch Step: %d Loss: %f" %
                   (i, loss / float(batch.ntokens)))
+            logger['loss'].append(total_loss / total_tokens)
+
             start = time.time()
             tokens = 0
            
@@ -142,6 +145,9 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
                 bleu_val = valid(model.module, src_dict, tgt_dict, valid_iter, args.valid_max_num)
             else:
                 bleu_val = valid(model, src_dict, tgt_dict, valid_iter, args.valid_max_num)
+
+            if logger is not None:
+                logger['bleu'].append(bleu_val)
 
             print("BLEU ", bleu_val)
 
@@ -200,7 +206,7 @@ def run_epoch(args, data_iter, model, loss_compute, valid_params=None, epoch_num
         print("BLEU (validation) ", bleu_val)
         return total_loss / total_tokens, bleu_val
 
-    return total_loss / total_tokens
+    return total_loss / total_tokens, logger
 
 
 class LabelSmoothing(nn.Module):
