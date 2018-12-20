@@ -53,10 +53,10 @@ def debug_compress_info(model, model2):
     print("Num parameters in compress fc layer", np.sum(w1_param))
     flag = False
 
-    w1_param = []
+    w2_param = []
     for name, param in model.named_parameters():
-        if name.__contains__("decoder.layers.5.feed_forward.w_1"):
-            w1_param.append(np.prod(param.size()))
+        if name.__contains__("decoder.layers.3.feed_forward.w_1"):
+            w2_param.append(np.prod(param.size()))
             if not flag:
                 print(param.size())
                 flag = True
@@ -65,7 +65,7 @@ def debug_compress_info(model, model2):
         if name.__contains__("tgt_embed"):
             num_embd1.append(np.prod(param.size()))
 
-    print("Num parameters in original fc layer", np.sum(w1_param))
+    print("Num parameters in original fc layer", np.sum(w2_param))
 
     print("Number of parameters in embeddings layer")
     print(np.sum(num_embd1))
@@ -133,6 +133,7 @@ def train(args):
         model2 = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
                                 d_model=args.hidden_dim, d_ff=args.ff_dim,
                                 N=args.num_blocks, compress=True,
+                                compress_mode=args.compress_mode,
                                 num_compress_enc=args.num_enc_blocks_comp,
                                 num_compress_dec=args.num_dec_blocks_comp)
 
@@ -216,10 +217,11 @@ def test(args):
 
     print("FC matrix:", args.hidden_dim, args.ff_dim)
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
-                                   d_model=args.hidden_dim, d_ff=args.ff_dim,\
-                                   N=args.num_blocks, compress=args.compress, \
-                                    num_compress_enc = args.num_enc_blocks_comp,
-                                    num_compress_dec = args.num_dec_blocks_comp)
+                                   d_model=args.hidden_dim, d_ff=args.ff_dim,
+                                   N=args.num_blocks, compress=args.compress,
+                                   compress_mode=args.compress_mode,
+                                   num_compress_enc = args.num_enc_blocks_comp,
+                                   num_compress_dec = args.num_dec_blocks_comp,)
     model.to(device)
     if args.load_model:
         print('load model from [%s]' % args.load_model, file=sys.stderr)

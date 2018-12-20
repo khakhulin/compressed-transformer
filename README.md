@@ -93,7 +93,7 @@ Compression ratio is the ration of #(original parameters) to #(parameters in com
 
 ### IWSLT14
 
-It's interesting that network with less parameters can be train in more efficiently.
+It's interesting that network with less parameters can be train in more efficiently way with small batch.
 
  | model | bleu-valid | bleu-test | time |
  | ------ | ---- | ---- | ---- |
@@ -102,7 +102,20 @@ It's interesting that network with less parameters can be train in more efficien
  | compressed 3| 0.212 | 0.192 | 187.35 |
  
  
+ | model | bleu| time | 
+ | ------ | ---- | ---- |
+ | transformer | 0.291 | 154.23 | 
+ | compressed 6| 0.292 | 241.24 | 
+ | compressed 3| 0.297 | 180.81 |
+ | tucker | 0.283 | 198.3 |
+ 
+ 
  *time for inference
+ 
+  ![image1](./imgs/full_val_bleu_curve.png)
+
+ 
+ Results for small batch: 
  
  ![image1](./imgs/val_bleu_curve.png)
  
