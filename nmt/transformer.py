@@ -1,4 +1,4 @@
-'''Borrowed bu The Annotated Transformer'''
+'''Borrowed from The Annotated Transformer'''
 import numpy as np
 import torch
 import torch.nn as nn
