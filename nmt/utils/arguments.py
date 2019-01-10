@@ -40,6 +40,10 @@ def init_config():
     parser.add_argument('--valid_every', default=150, type=int, help='how often validate bleu in epoch')
 
     # Compress parameters
+    parser.add_argument('--compress', default=False, action='store_true', help='train compressed')
+    parser.add_argument('--compress_mode', type=str, default='tt',
+                        help='Decomposition for training in compressed mode: tt | tucker')
+    parser.add_argument('--compress_attn', default=False, action='store_true', help='train with compressed matrix v')
 
     # Training parameters
     parser.add_argument('--valid_niter', default=800, type=int, help='every n iterations to perform validation')
@@ -61,8 +65,7 @@ def init_config():
     parser.add_argument('--lr_decay', default=0.5, type=float, help='decay learning rate if the validation performance drops')
 
     parser.add_argument('--debug', default=False, action='store_true')
-    parser.add_argument('--compress', default=False, action='store_true', help='train compressed')
-    parser.add_argument('--compress_mode', type=str, default='tt', help='Decomposition for training in compressed mode: tt | tucker')
+
     parser.add_argument('--multi-gpu', default=False, action='store_true')
     parser.add_argument('--num_devices', default=2, type=int, help='numbers of gpus')
 

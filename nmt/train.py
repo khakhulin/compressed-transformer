@@ -91,8 +91,8 @@ def train(args):
     print("FC matrix:", args.hidden_dim, args.ff_dim)
     print(args.compress)
     model = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
-                                   d_model=args.hidden_dim, d_ff=args.ff_dim,
-                                   N=args.num_blocks, compress=args.compress,
+                                   d_model=args.hidden_dim, d_ff=args.ff_dim, N=args.num_blocks,
+                                   compress=args.compress, compress_att=args.compress_attn,
                                    compress_mode=args.compress_mode,
                                    num_compress_enc=args.num_enc_blocks_comp,
                                    num_compress_dec=args.num_dec_blocks_comp
@@ -128,7 +128,6 @@ def train(args):
     model_parameters = filter(lambda p: p.requires_grad, model.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print("Number of parameters: ", params)
-
     if args.debug:
         model2 = transformer.make_model(len(SRC.vocab), len(TGT.vocab),
                                 d_model=args.hidden_dim, d_ff=args.ff_dim,
