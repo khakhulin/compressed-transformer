@@ -72,6 +72,13 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# Vim files
+*.swo
+*.swp
+
+# OS X directories
+.DS_Store
+
 # pyenv
 .python-version
 
