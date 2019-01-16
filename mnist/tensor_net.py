@@ -58,7 +58,8 @@ class TTLayer(nn.Module):
     self.ranks = ranks
     with torch.no_grad():
       weight = layer.weight.transpose(1, 0)
-      self.cores = matrix_to_tt_cores(weight, shapes, ranks)
+      self.cores = nn.ParameterList(
+          map(nn.Parameter, matrix_to_tt_cores(weight, shapes, ranks)))
     self.bias = layer.bias
 
   def forward(self, inputs):
