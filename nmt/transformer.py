@@ -179,11 +179,12 @@ class MultiHeadedAttention(nn.Module):
         self.d_k = d_model // h
         self.h = h
 
-        d_out_modes = [4, 4, 8, 4, 4]
         d_in_modes = [2, 4, 8, 4, 2]
-        tt_ranks = [1, 4, 4, 4, 4, 1]
+        tt_ranks = [1, 2, 2, 2, 2, 1]
+        is_bias = False
+
         if compress:
-            self.linears = clones(ttm.TTLayer(d_in_modes, d_in_modes, tt_ranks, bias=False), 4)
+            self.linears = clones(tucker.TuckerLinear(d_in_modes, d_in_modes, [2] * len(d_in_modes), bias=False), 4)
         else:
             self.linears = clones(nn.Linear(d_model, d_model), 4)
         self.attn = None
@@ -209,8 +210,6 @@ class MultiHeadedAttention(nn.Module):
              .view(nbatches, -1, self.h * self.d_k)
         return self.linears[-1](x)
 
-
-
 class PositionwiseFeedForward(nn.Module):
     "Implements FFN equation."
     def __init__(self, d_model, d_ff, dropout=0.1, compress_mode=None):
@@ -224,14 +223,14 @@ class PositionwiseFeedForward(nn.Module):
             if compress_mode == 'tt':
                 # tensor train
 
-                tt_ranks = [1, 3, 48, 76, 7, 1]
+                tt_ranks = [1, 2, 2, 2, 2, 1]
                 tt_ranks2 = [ 1,  1, 16, 54,  6,  1]
                 tt_ranks3 = [1, 4, 4, 4, 4, 1]
                 tt_ranks4 = [1, 2, 4, 4, 2, 1]
                 tt_ranks8 = [1, 2, 4, 8, 4, 2, 1]
 
-                self.w_1 = ttm.TTLayer(d_in_modes, d_out_modes, tt_ranks4, bias=False)
-                self.w_2 = ttm.TTLayer(d_out_modes,d_in_modes, tt_ranks3, bias=False)
+                self.w_1 = ttm.TTLayer(d_in_modes, d_out_modes, tt_ranks3, bias=False)
+                self.w_2 = ttm.TTLayer(d_out_modes,d_in_modes, tt_ranks4, bias=False)
             else:
                 # tucker
                 tucker_ranks = [2] * len(d_in_modes)
