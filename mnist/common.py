@@ -47,6 +47,7 @@ class MNISTModel(nn.Module):
 
 
 def learn(model, trainloader, nepochs, optimizer,
+          loss_function=nn.functional.cross_entropy,
           metrics=None, logperiod=10):
   metrics = metrics or []
   device = get_device()
@@ -60,7 +61,7 @@ def learn(model, trainloader, nepochs, optimizer,
       outputs = model(inputs)
       labels = labels.to(device)
 
-      loss = nn.functional.cross_entropy(outputs, labels)
+      loss = loss_function(outputs, labels)
       if i % logperiod == 0:
         iters.append(datasize * epoch + i)
         losses.append(loss)
@@ -76,6 +77,8 @@ def learn(model, trainloader, nepochs, optimizer,
 
 def accuracy(outputs, labels):
   _, predictions = torch.max(outputs, -1)
+  if isinstance(labels, torch.FloatTensor):
+    _, labels = torch.max(labels, -1)
   return (labels == predictions).type(torch.float32).mean()
 
 
