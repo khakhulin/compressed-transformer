@@ -1,19 +1,13 @@
 
 # Compressed Transformer
-
-
-○ Application of tensors method for compression neural machine translation model  ○
- 
-
-
+Application of tensors method for compression neural machine translation model
 
 The project support training and translation with trained model without beam search.
 
 Note that this project is still a work in progress.
 
-> We use WMT16 (Multi30k) dataset and IWSLT14 for our experiments.
-
-> To learn more about Transformer you could read "[Annotated Transformer](http://nlp.seas.harvard.edu/2018/04/03/attention.html)"  
+* We use WMT16 (Multi30k) dataset and IWSLT14 for our experiments.
+* To learn more about Transformer you could read "[Annotated Transformer](http://nlp.seas.harvard.edu/2018/04/03/attention.html)".  
 
 
 ## Main Results
@@ -35,8 +29,9 @@ i.e. Transformer Network
 * pytorch 0.4.1+
 * nltk
 * torchtext
+
 For MNIST experiments
-* Install tntorch
+* tntorch
 
 
 ## Run NMT
@@ -74,10 +69,10 @@ PYTHONPATH="." python3 nmt/train.py --seed 45  --save_model_after 1000 \
  
 ## How model can be compressed?
 The Feed-Forward network is a simple block with one hidden linear layer 
-and one projection layer. The most popular choice for the dimensions are 512 x 2048 for the hidden layer 
+and one projection layer. The most popular choice for the dimensions are 512x2048 for the hidden layer 
 and  2048x512 for the projection layer,
- so in one Feed-Forward network we have $2^{21}$ parameters and this block is repeated in each of the 
- 2N Transformer blocks.
+ so in one Feed-Forward network we have 2M parameters and this block is repeated in each of the 
+ *2N* Transformer blocks.
   That is why we decided to compress these parts of the model. 
   We applied method of tensoring neural networks to every linear layer in
    the feed-forward block to obtain significant compression. 
@@ -235,4 +230,4 @@ Please cite this repository if it was useful for your research
 
 1. Vaswani, Ashish, et al. ["Attention is all you need."](https://arxiv.org/abs/1706.03762.pdf) Advances in Neural Information Processing Systems. 2017.
 2. Novikov, Alexander, et al. ["Tensorizing neural networks."](https://arxiv.org/pdf/1509.06569.pdf) Advances in Neural Information Processing Systems. 2015.
-3. Rush, Alexander, et al. ["The Annotated Transformer"](http://aclweb.org/anthology/W18-2509)  NLP Open Source Software, 2018
+3. Rush, Alexander, et al. ["The Annotated Transformer."](http://aclweb.org/anthology/W18-2509)  NLP Open Source Software, 2018
