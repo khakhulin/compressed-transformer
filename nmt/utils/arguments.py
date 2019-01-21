@@ -65,6 +65,8 @@ def init_config():
     parser.add_argument('--lr_decay', default=0.5, type=float, help='decay learning rate if the validation performance drops')
 
     parser.add_argument('--debug', default=False, action='store_true')
+    parser.add_argument('--iwslt', default=False, action='store_true')
+
 
     parser.add_argument('--multi-gpu', default=False, action='store_true')
     parser.add_argument('--num_devices', default=2, type=int, help='numbers of gpus')

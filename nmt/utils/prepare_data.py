@@ -72,8 +72,11 @@ def prepare_data(args):
                         lower=args.lower)
 
     MAX_LEN = args.max_lenght
-
-    train_data, val_data, test_data = datasets.Multi30k.splits(
+    if args.iwslt:
+        datatype = IWSLT14
+    else:
+        datatype = datasets.Multi30k
+    train_data, val_data, test_data = datatype.splits(
         exts=('.de', '.en'), fields=(SRC, TGT),
         filter_pred=lambda x: len(vars(x)['src']) <= MAX_LEN and
                               len(vars(x)['trg']) <= MAX_LEN
