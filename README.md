@@ -103,6 +103,8 @@ In this setting, we achieve the highest compression ration:
  | IWSLT 14 | | |
 
 
+**Note:** All results below are given without compression self-attention in the model.
+
 ### Multi30k
 
 An example of training for the WMT'16 Multimodal Translation task (http://www.statmt.org/wmt16/multimodal-task.html).
@@ -186,12 +188,9 @@ It's interesting that network with less parameters can be train in more efficien
   ![image1](./imgs/full_val_bleu_curve.png)
 
  
- Results for small batch: 
+ Results for *small* batch: 
  
- ![image1](./imgs/val_bleu_curve.png)
- 
- 
-  ![image2](./imgs/val_loss_curve.png)
+ ![image1](./imgs/val_bleu_curve.png) ![image2](./imgs/val_loss_curve.png)
   
 
 ## MNIST experiments
@@ -217,16 +216,18 @@ If you have ideas or find mistakes [please leave a note](https://github.com/khak
 -coming soon
 
 ## Citation
-Use this bibtex entry to cite the repository:
+Please cite this repository if it was useful for your research
 
+```
 @misc{compressed_transformer,
   title={Compresed Transformer},
-  author={},
+  author={Khakhulin, Taras and Saparina, Irina and Shevchenko, Aleksandr and Konobeev, Michael},
   year={2019},
   publisher={Github},
   journal={GitHub repository},
-  howpublished={\url{https://github.com/khakhulin/Compressed-transformer}},
+  howpublished={\url{https://github.com/khakhulin/compressed-transformer}},
 }
+```
 
 
 
@@ -234,4 +235,4 @@ Use this bibtex entry to cite the repository:
 
 1. Vaswani, Ashish, et al. ["Attention is all you need."](https://arxiv.org/abs/1706.03762.pdf) Advances in Neural Information Processing Systems. 2017.
 2. Novikov, Alexander, et al. ["Tensorizing neural networks."](https://arxiv.org/pdf/1509.06569.pdf) Advances in Neural Information Processing Systems. 2015.
-3. Rush, Alexander, et al. ["The Annotated Transformer"])(http://aclweb.org/anthology/W18-2509)  NLP Open Source Software, 2018
+3. Rush, Alexander, et al. ["The Annotated Transformer"](http://aclweb.org/anthology/W18-2509)  NLP Open Source Software, 2018
