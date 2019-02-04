@@ -27,7 +27,6 @@ class Batch:
         "Create a mask to hide padding and future words."
         tgt_mask = (tgt != pad).unsqueeze(-2)
         tgt_mask = tgt_mask & transformer.subsequent_mask(tgt.size(-1)).type_as(tgt_mask)
-        tgt_mask = torch.tensor(tgt_mask, dtype=torch.float, requires_grad=True, device=tgt.device)
         return tgt_mask
     
 
