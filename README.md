@@ -94,11 +94,11 @@ In this setting, we achieve the highest compression ration:
  
  | dataset | Test |  Compression <br>  Rate | 
  |-------- | -------| -----------------|
- | Multi30k | | |
- | IWSLT 14 | | |
+ | Multi30k | 0.441 | 1.61 |
+ | IWSLT 14 | 0.297 |  1.61 |
 
 
-**Note:** All results below are given without compression self-attention in the model.
+**Note:** All results below are given without compression self-attention and Embedding layer which consist the main part parameters. 
 
 ### Multi30k
 
